@@ -122,12 +122,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-apk
-          name: 守护 APK (latest)
+          name: 佳景 APK (latest)
           body: |
             版本 ${{ steps.ver.outputs.label }} · 自动构建（commit ${{ github.sha }}）
 
             - 全屏无状态栏，内容铺满刘海/挖孔区域
-            - 数据导入导出写到「下载/守护」
+            - 键盘弹出时底部那条缝跟随页面底色，不再出现黑条
+            - 数据导入导出写到「下载/佳景」
             - 返回键 / 左右边缘滑动逐层返回，不直接退出
             - 已开放录音、相机、定位、通知、存储等运行所需权限
             - 已移除右上角红色 DEBUG 按钮
