@@ -134,5 +134,6 @@ jobs:
 
             直接点下方 `shouhu-debug.apk` 下载安装即可（覆盖安装不会丢数据）。
           files: out/shouhu-debug.apk
-          prerelease: true
+          # 标成正式发布（而不是 pre-release），这样仓库首页 / releases/latest 都能直接看到 APK
+          prerelease: false
           fail_on_unmatched_files: true
