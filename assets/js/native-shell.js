@@ -1,10 +1,10 @@
 /**
- * 守护 · 原生壳脚本（Android APK 内生效，浏览器打开时基本什么都不做）
+ * 佳景 · 原生壳脚本（Android APK 内生效，浏览器打开时基本什么都不做）
  * ------------------------------------------------------------------
- * 解决三件事：
+ * 解决四件事：
  *   1. 导出：WebView 不支持 <a download>，应用的存档 / 图片导出全是
  *      「URL.createObjectURL(blob) + a.download + a.click()」，在 APK 里点了没反应。
- *      这里把数据分块交给原生层，直接写进系统「下载/守护」（见 ShellBridge.java）。
+ *      这里把数据分块交给原生层，直接写进系统「下载/佳景」（见 ShellBridge.java）。
  *   2. 导入：<input type="file"> 由 Capacitor 的 WebChromeClient 接管系统文件选择器，
  *      这里不用管；只保证导出后的文件能被文件管理器看到、再选回来。
  *   3. 返回：Android 返回键 / 左右边缘滑动 → 先把最上层弹层、子页面逐层收起，
@@ -29,7 +29,7 @@
   }
 
   /* ================================================================
-   * 一、导出：blob: / data: → 系统「下载/守护」
+   * 一、导出：blob: / data: → 系统「下载/佳景」
    * ================================================================ */
 
   var CHUNK = 512 * 1024; // 单次跨桥字节数：base64 后约 683KB，避免超大字符串卡死主线程
@@ -70,7 +70,7 @@
   }
 
   function guessName(mime) {
-    return '守护-' + Date.now() + guessExt(mime || '');
+    return '佳景-' + Date.now() + guessExt(mime || '');
   }
 
   /** 分块写进原生层；返回 true 表示已保存 */
@@ -359,12 +359,111 @@
   }
 
   /* ================================================================
+   * 四、页面底色回报：键盘弹出时 WebView 会变矮，下面留出的那条缝由原生填色。
+   *     颜色必须等于页面自己的底色，否则就会看到一条黑边（真机上反馈过的 bug）。
+   * ================================================================ */
+
+  /** computed backgroundColor 是否「完全透明」：transparent / rgba(0,0,0,0) */
+  function isTransparentBg(bg) {
+    if (!bg) return true;
+    var s = String(bg).replace(/\s+/g, '').toLowerCase();
+    if (s === 'transparent') return true;
+    var m = s.match(/^rgba?\(([^)]*)\)$/);
+    if (!m) return false;
+    var parts = m[1].split(',');
+    if (parts.length < 4) return false;
+    return parseFloat(parts[3]) === 0;
+  }
+
+  /** 从元素往上找第一个不透明的背景色（弹层、卡片、聊天底、body 都算） */
+  function nearestBgColor(el) {
+    while (el && el.nodeType === 1) {
+      var bg = '';
+      try { bg = window.getComputedStyle(el).backgroundColor; } catch (e) { bg = ''; }
+      if (!isTransparentBg(bg)) return bg;
+      el = el.parentElement;
+    }
+    return '';
+  }
+
+  /** body/html 用渐变时 backgroundColor 是透明的，取渐变里最后一个色标当底色 */
+  function gradientTailColor() {
+    var els = [document.body, document.documentElement];
+    for (var i = 0; i < els.length; i++) {
+      if (!els[i]) continue;
+      var img = '';
+      try { img = window.getComputedStyle(els[i]).backgroundImage || ''; } catch (e) { img = ''; }
+      if (!img || img === 'none') continue;
+      var colors = img.match(/rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}/g);
+      if (colors && colors.length) return colors[colors.length - 1];
+    }
+    return '';
+  }
+
+  /** 页面底部真实底色：优先看最底下那块元素，再退到 body 渐变 / 纯色 */
+  function pickPageBg() {
+    var el = null;
+    try {
+      var w = window.innerWidth || 1;
+      var h = window.innerHeight || 1;
+      el = document.elementFromPoint(w / 2, h - 3) || document.elementFromPoint(w / 2, h - 40) || document.body;
+    } catch (e) {
+      el = document.body;
+    }
+    var c = nearestBgColor(el);
+    if (c) return c;
+    c = gradientTailColor();
+    if (c) return c;
+    return '#f5f7fa'; // 页面确实没有底色时用中性浅色兜底，绝不留黑
+  }
+
+  /** 把底色告诉原生层；同时挂成 window.__appPageBg()，原生可以主动来问 */
+  function reportPageBg() {
+    if (!isNative) return '';
+    var color = '';
+    try { color = pickPageBg(); } catch (e) { color = ''; }
+    if (!color) return '';
+    try { if (API.setPageBackground) API.setPageBackground(color); } catch (e) { /* ignore */ }
+    return color;
+  }
+
+  var bgTimer = 0;
+
+  function schedulePageBg(delay) {
+    if (!isNative) return;
+    if (bgTimer) clearTimeout(bgTimer);
+    bgTimer = setTimeout(function () {
+      bgTimer = 0;
+      reportPageBg();
+    }, delay || 120);
+  }
+
+  /** 页面切换 / 弹层开合 / 键盘弹出都会重排，跟着刷新一次底色 */
+  function installPageBgReporter() {
+    window.__appPageBg = reportPageBg;
+
+    // 键盘弹出前一定会先 focus 输入框：这时就把底色刷好，缝一出现颜色就是对的
+    document.addEventListener('focusin', function () { schedulePageBg(60); }, true);
+    window.addEventListener('resize', function () { schedulePageBg(150); });
+    window.addEventListener('orientationchange', function () { schedulePageBg(300); });
+    document.addEventListener('visibilitychange', function () { schedulePageBg(150); });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function () { schedulePageBg(150); });
+    }
+
+    reportPageBg();
+    setTimeout(reportPageBg, 400);
+    setTimeout(reportPageBg, 1500);
+  }
+
+  /* ================================================================
    * 启动
    * ================================================================ */
 
   if (isNative) {
     installDownloadBridge();
     installEdgeSwipe();
+    installPageBgReporter();
     try { API.ready(); } catch (e) { /* ignore */ }
 
     // 未捕获异常透传到 logcat，方便排查 APK 里才出现的问题

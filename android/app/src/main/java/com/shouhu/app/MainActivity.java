@@ -8,10 +8,12 @@ import android.app.DownloadManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -39,19 +41,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 守护 的 Android 壳。
+ * 佳景 的 Android 壳。
  *
- * 四件事：
+ * 五件事：
  *  1. 全屏沉浸式：decorFitsSystemWindows=false + 隐藏状态栏/导航栏（上滑临时呼出），
  *     WebView 铺满整屏（含刘海/挖孔区域，没有黑边）；
  *  2. 键盘不挡输入框：自己量键盘高度（API 30+ 用 ime() inset，老系统用
  *     getWindowVisibleDisplayFrame 差值），给 WebView 加 bottomMargin 让它真的变矮，
  *     网页 viewport 随之变小，输入框就被顶到键盘上方。margin 变化走动画：弹出时缩得比
  *     系统键盘慢（否则输入框瞬间跳上去、键盘还没盖住，中间露一块黑），收起时立即恢复；
- *  3. 返回不退出应用：系统返回键 / 边缘滑动返回 → 先调网页的 window.__appBack()
+ *  3. 键盘上方那条缝填色：WebView 变矮后露出来的是窗口背景，必须刷成页面自己的底色
+ *     （native-shell.js 把 body/最底层元素的 background-color 报上来，见 applyPageBackground），
+ *     否则深色窗口背景下就是一条黑条；
+ *  4. 返回不退出应用：系统返回键 / 边缘滑动返回 → 先调网页的 window.__appBack()
  *     （由 native-shell.js 按 z-index 找最上层弹窗/页面并关掉）→ 再退 WebView 历史
  *     → 真的没得退了才「再按一次退出」；
- *  4. 首次启动把运行需要的权限要一遍（相机、录音、定位、通知、媒体读取）。
+ *  5. 首次启动把运行需要的权限要一遍（相机、录音、定位、通知、媒体读取）。
  */
 public class MainActivity extends BridgeActivity {
 
@@ -73,6 +78,11 @@ public class MainActivity extends BridgeActivity {
     private ValueAnimator marginAnimator;
     /** 正在动画到的目标值，用来挡掉 global layout 每帧触发的重复重启 */
     private int marginTarget = -1;
+
+    /** 页面底部底色（ARGB）。键盘弹出时 WebView 变矮，留下的那条缝用它填，不留黑条 */
+    private int pageBgColor = 0xFFF5F7FA;
+    /** 上次问网页底色的时间，避免每帧都 evaluateJavascript */
+    private long lastBgQueryAt = 0L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,10 +110,15 @@ public class MainActivity extends BridgeActivity {
         if (webView == null) {
             Log.e(TAG, "webView is null, shell features disabled");
         } else {
-            webView.setBackgroundColor(0xFF000000);
+            // 键盘弹出时让出来的那条缝要跟页面同色（默认先给浅色，页面加载完再按真实底色刷）
+            pageBgColor = ContextCompat.getColor(this, R.color.app_bg);
+            applyPageBackground(pageBgColor);
             webView.addJavascriptInterface(new ShellBridge(this), "AndroidShell");
             webView.setDownloadListener(this::onDownloadRequest);
             installKeyboardWatcher(webView);
+            // 页面画出来 / 首屏稳定后各问一次页面底色
+            webView.postDelayed(() -> samplePageBackground(webView), 800L);
+            webView.postDelayed(() -> samplePageBackground(webView), 2500L);
             // 等页面画出来再弹权限框，避免挡住首屏
             webView.postDelayed(this::requestStartupPermissions, 1200L);
         }
@@ -143,6 +158,8 @@ public class MainActivity extends BridgeActivity {
                 imeInsetBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
                 if (imeInsetBottom > 0) imeInsetSeen = true;
             }
+            // 键盘要弹了：先把背景刷成页面底色，缝一出现颜色就是对的
+            if (imeInsetBottom > 0) samplePageBackground(webView);
             v.post(this::updateKeyboardState);
             return insets;
         });
@@ -173,6 +190,8 @@ public class MainActivity extends BridgeActivity {
         if (kb < dp(80)) kb = 0;
 
         if (kb != imeBottom) Log.i(TAG, "keyboard=" + kb + " (inset=" + imeInsetBottom + ", frame=" + frameKb + ")");
+        // 键盘刚弹出：兜底再问一次页面底色（有些页面是在 focus 时才换底色的）
+        if (kb > 0 && imeBottom == 0) samplePageBackground(webView);
         imeBottom = kb;
 
         // 动画进行中，测量抖动（滚动条、导航栏残值）不要打断它，否则会来回重启、越拖越慢
@@ -262,6 +281,63 @@ public class MainActivity extends BridgeActivity {
         view.setLayoutParams(mlp);
     }
 
+    /**
+     * 把「键盘上方那条缝」刷成页面底色。
+     *
+     * WebView 加了 bottomMargin 之后，让出来的那块显示的是窗口背景。以前窗口背景是纯黑，
+     * 键盘弹出时就会看到输入框和键盘之间压着一条黑边。这里把窗口、decorView、WebView
+     * 以及它的父容器一起刷成页面当前底色，无论那条缝是窗口露出来的还是 WebView 没画满，
+     * 看到的都跟页面连成一片。
+     *
+     * 颜色由网页侧提供（native-shell.js 的 pickPageBg：取页面最底部元素的 background-color，
+     * 取不到就用 body 渐变末端色，再取不到用中性浅色），所以深色 / 浅色主题都能贴合。
+     */
+    void applyPageBackground(final int color) {
+        if (color == 0) return;
+        pageBgColor = color;
+        final Runnable paint = () -> {
+            try {
+                Window w = getWindow();
+                w.setBackgroundDrawable(new ColorDrawable(color));
+                View decor = w.getDecorView();
+                if (decor != null) decor.setBackgroundColor(color);
+                WebView wv = (bridge == null) ? null : bridge.getWebView();
+                if (wv != null) {
+                    wv.setBackgroundColor(color);
+                    if (wv.getParent() instanceof View) ((View) wv.getParent()).setBackgroundColor(color);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "applyPageBackground failed", e);
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            paint.run();
+        } else {
+            runOnUiThread(paint);
+        }
+    }
+
+    /**
+     * 问网页要「当前页面底部底色」：window.__appPageBg() 返回 CSS 颜色串，
+     * 拿到就刷到原生背景上。请求做了节流，键盘弹出、页面切换时调用一次即可。
+     */
+    void samplePageBackground(WebView webView) {
+        if (webView == null) return;
+        long now = System.currentTimeMillis();
+        if (now - lastBgQueryAt < 150L) return;
+        lastBgQueryAt = now;
+        try {
+            webView.evaluateJavascript(
+                    "(function(){try{return (window.__appPageBg&&window.__appPageBg())||''}catch(e){return ''}})()",
+                    value -> {
+                        int color = ShellBridge.parseCssColor(value);
+                        if (color != 0 && color != pageBgColor) applyPageBackground(color);
+                    });
+        } catch (Exception e) {
+            Log.w(TAG, "samplePageBackground failed", e);
+        }
+    }
+
     /** 键盘是否在显示（返回键先用它收键盘，而不是直接退页面） */
     private boolean isKeyboardVisible() {
         return imeBottom > 0;
@@ -323,7 +399,7 @@ public class MainActivity extends BridgeActivity {
     /**
      * http(s) 下载走系统下载器。
      * blob: / data: 在 DownloadListener 里拿不到内容，那部分由 native-shell.js
-     * 通过 AndroidShell 桥分块写进「下载/守护」。
+     * 通过 AndroidShell 桥分块写进「下载/佳景」。
      */
     private void onDownloadRequest(String url, String userAgent, String contentDisposition,
                                    String mimetype, long contentLength) {
@@ -338,7 +414,7 @@ public class MainActivity extends BridgeActivity {
             req.setMimeType(mimetype);
             req.setTitle(fileName);
             req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "守护/" + fileName);
+            req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "佳景/" + fileName);
             if (userAgent != null) req.addRequestHeader("User-Agent", userAgent);
             String cookie = CookieManager.getInstance().getCookie(url);
             if (cookie != null) req.addRequestHeader("Cookie", cookie);

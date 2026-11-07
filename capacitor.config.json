@@ -1,9 +1,9 @@
 {
   "appId": "com.shouhu.app",
-  "appName": "守护",
+  "appName": "佳景",
   "webDir": "www",
   "android": {
-    "backgroundColor": "#000000",
+    "backgroundColor": "#F5F7FA",
     "allowMixedContent": true,
     "webContentsDebuggingEnabled": false,
     "captureInput": false,
@@ -17,7 +17,7 @@
   "plugins": {
     "Keyboard": {
       "resize": "none",
-      "resizeOnFullScreen": true
+      "resizeOnFullScreen": false
     }
   }
 }

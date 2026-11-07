@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- 窗口背景统一用黑色，隐藏系统栏 / 键盘动画过程中不会露出白边 -->
-    <color name="app_bg">#000000</color>
+    <!-- 窗口 / WebView 的默认底色。
+         页面真正的底色由 MainActivity.applyPageBackground() 在运行时按网页回报的颜色刷新，
+         这里只是首帧兜底，取的是页面浅色渐变的中性色，避免出现黑边。 -->
+    <color name="app_bg">#F5F7FA</color>
+
+    <!-- 启动图（Android 12+ 用 windowSplashScreenBackground，12 以下用 drawable/splash）的底色，
+         和 ic_launcher 插画背景同色 -->
+    <color name="splash_bg">#D8ECFA</color>
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -29,7 +35,7 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
-        <item name="windowSplashScreenBackground">@color/app_bg</item>
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>

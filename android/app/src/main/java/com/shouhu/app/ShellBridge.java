@@ -18,6 +18,7 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 
 /**
  * 注入给网页的原生桥（window.AndroidShell）。
@@ -25,7 +26,7 @@ import java.io.OutputStream;
  * 存在的原因：Android WebView 不支持 <a download>，而应用的导出（存档 / 图片 / 主题）
  * 全部是「createObjectURL + a.download + a.click()」，在 WebView 里点了完全没反应。
  * 这里把数据分块接过来，直接写进系统「下载」目录：
- *   - API 29+ 走 MediaStore（Download/守护/xxx），不需要任何权限；
+ *   - API 29+ 走 MediaStore（Download/佳景/xxx），不需要任何权限；
  *   - API < 29 先试公共下载目录，没权限就落到应用专属目录（路径会 toast 出来）。
  *
  * 分块是因为 JavascriptInterface 传超大字符串（几十 MB 的 base64）会卡死甚至 OOM。
@@ -33,9 +34,10 @@ import java.io.OutputStream;
 public class ShellBridge {
 
     private static final String TAG = "ShouhuShell";
-    private static final String FOLDER = "守护";
+    private static final String FOLDER = "佳景";
     private static final int BUF = 64 * 1024;
 
+    private final MainActivity activity;
     private final Context ctx;
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -45,8 +47,9 @@ public class ShellBridge {
     private String pendingName = "";
     private long written = 0L;
 
-    ShellBridge(Context context) {
-        this.ctx = context.getApplicationContext();
+    ShellBridge(MainActivity activity) {
+        this.activity = activity;
+        this.ctx = activity.getApplicationContext();
     }
 
     // ---------------- 状态 / 调试 ----------------
@@ -65,6 +68,72 @@ public class ShellBridge {
     public void toast(final String msg) {
         if (msg == null) return;
         main.post(() -> Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * 网页把「当前页面底部的真实底色」报上来（CSS 颜色串）。
+     *
+     * 用途：键盘弹出时 WebView 会让出键盘高度，留下的一条缝显示的是窗口背景。
+     * 那条缝必须跟页面底色一致，否则就是用户看到的那条黑边。
+     */
+    @JavascriptInterface
+    public void setPageBackground(final String cssColor) {
+        final int color = parseCssColor(cssColor);
+        if (color == 0) return;
+        main.post(() -> activity.applyPageBackground(color));
+    }
+
+    /** 把 CSS 颜色串（#rgb / #rrggbb / #rrggbbaa / rgb() / rgba()）解析成 ARGB；失败返回 0 */
+    static int parseCssColor(String raw) {
+        if (raw == null) return 0;
+        String s = raw.trim();
+        // evaluateJavascript 回传的是 JSON 字符串：外面带引号，内部可能带转义
+        if (s.length() >= 2 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+            s = s.substring(1, s.length() - 1);
+        }
+        s = s.replace("\\\"", "").replace("\\", "").trim().toLowerCase(Locale.US);
+        if (s.isEmpty() || "transparent".equals(s) || "none".equals(s)) return 0;
+        try {
+            if (s.startsWith("#")) {
+                String h = s.substring(1);
+                if (h.length() == 3) {
+                    h = "" + h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+                } else if (h.length() == 8) {
+                    h = h.substring(0, 6); // #rrggbbaa：忽略透明度
+                }
+                if (h.length() != 6) return 0;
+                return 0xFF000000 | Integer.parseInt(h, 16);
+            }
+            if (s.startsWith("rgb")) {
+                int open = s.indexOf('(');
+                int close = s.lastIndexOf(')');
+                if (open < 0 || close <= open) return 0;
+                // 兼容 rgb(255, 0, 0) / rgb(255 0 0) / rgba(255,0,0,.5) / rgb(255 0 0 / 50%)
+                String[] parts = s.substring(open + 1, close).trim().split("[,/\\s]+");
+                if (parts.length < 3) return 0;
+                int red = Math.round(Float.parseFloat(parts[0].trim()));
+                int green = Math.round(Float.parseFloat(parts[1].trim()));
+                int blue = Math.round(Float.parseFloat(parts[2].trim()));
+                if (parts.length >= 4) {
+                    // alpha 可能是 0.5、.5 或 50%
+                    String a = parts[3].trim();
+                    boolean percent = a.endsWith("%");
+                    float alpha = Float.parseFloat(percent ? a.substring(0, a.length() - 1) : a);
+                    if (percent) alpha /= 100f;
+                    if (alpha <= 0f) return 0;
+                }
+                return 0xFF000000 | (clamp255(red) << 16) | (clamp255(green) << 8) | clamp255(blue);
+            }
+        } catch (Exception e) {
+            return 0;
+        }
+        return 0;
+    }
+
+    private static int clamp255(int v) {
+        if (v < 0) return 0;
+        if (v > 255) return 255;
+        return v;
     }
 
     // ---------------- 文件保存（分块） ----------------

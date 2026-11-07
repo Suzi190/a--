@@ -1,6 +1,6 @@
 {
 	"appId": "com.voicechat.app",
-	"appName": "守护",
+	"appName": "佳景",
 	"webDir": "www",
 	"android": {
 		"allowMixedContent": true,
