@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>角色装扮编辑器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .editor-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+        
+        /* 左侧图层管理 - 默认隐藏 */
+        .layer-sidebar {
+            position: fixed;
+            left: -250px;
+            top: 0;
+            width: 250px;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(0,0,0,0.1);
+            z-index: 200;
+            transition: left 0.3s ease;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .layer-sidebar.open {
+            left: 0;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .close-sidebar {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f0f0f0;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .layer-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 8px;
+            cursor: move;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            font-size: 13px;
+        }
+        
+        .layer-item:hover {
+            transform: translateX(-2px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        
+        .layer-item.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .layer-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .layer-visibility {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        /* 遮罩层 */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 150;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* 中间预览区 */
+        .preview-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        #previewCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        /* 顶部工具栏 */
+        .top-toolbar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        .toolbar-left {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .toolbar-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .toolbar-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        /* 提示文字 */
+        .zoom-hint {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* 底部参数栏 */
+        .bottom-toolbar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(0,0,0,0.1);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 100;
+            overflow-x: auto;
+        }
+        
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        
+        .toolbar-label {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .toolbar-slider {
+            width: 80px;
+            height: 4px;
+            border-radius: 2px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .toolbar-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+        }
+        
+        .toolbar-value {
+            font-size: 11px;
+            color: #999;
+            min-width: 35px;
+            text-align: center;
+        }
+        
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .bottom-toolbar {
+                padding: 10px;
+                gap: 10px;
+            }
+            
+            .toolbar-slider {
+                width: 60px;
+            }
+            
+            .toolbar-btn {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <!-- 遮罩层 -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+        
+        <!-- 左侧图层管理侧边栏 -->
+        <div class="layer-sidebar" id="layerSidebar">
+            <div class="sidebar-header">
+                <h2>图层管理</h2>
+                <button class="close-sidebar" onclick="closeSidebar()">✕</button>
+            </div>
+            <div class="layer-list" id="layerList">
+                <!-- 图层项将通过JS动态生成 -->
+            </div>
+        </div>
+        
+        <!-- 中间预览区 -->
+        <div class="preview-area" id="previewArea">
+            <canvas id="previewCanvas"></canvas>
+            <div class="zoom-hint">双指缩放 / 拖拽移动</div>
+            
+            <!-- 顶部工具栏 -->
+            <div class="top-toolbar">
+                <div class="toolbar-left">
+                    <button class="toolbar-btn" onclick="openSidebar()">☰ 图层</button>
+                    <button class="toolbar-btn" onclick="history.back()">← 返回</button>
+                </div>
+                <div class="toolbar-right">
+                    <button class="toolbar-btn btn-primary" onclick="saveConfig()">💾 保存</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部参数栏 -->
+        <div class="bottom-toolbar">
+            <div class="toolbar-section">
+                <span class="toolbar-label">X</span>
+                <input type="range" class="toolbar-slider" id="posX" min="-200" max="200" value="0">
+                <span class="toolbar-value" id="posXValue">0</span>
+            </div>
+            <div class="toolbar-section">
+                <span class="toolbar-label">Y</span>
+                <input type="range" class="toolbar-slider" id="posY" min="-200" max="200" value="0">
+                <span class="toolbar-value" id="posYValue">0</span>
+            </div>
+            <div class="toolbar-section">
+                <span class="toolbar-label">缩放</span>
+                <input type="range" class="toolbar-slider" id="scale" min="0.5" max="3" step="0.1" value="1">
+                <span class="toolbar-value" id="scaleValue">1.0</span>
+            </div>
+            <div class="toolbar-section">
+                <span class="toolbar-label">旋转</span>
+                <input type="range" class="toolbar-slider" id="rotation" min="-180" max="180" value="0">
+                <span class="toolbar-value" id="rotationValue">0°</span>
+            </div>
+            <div class="toolbar-section" style="margin-left: auto;">
+                <button class="toolbar-btn" onclick="resetAll()">↺ 重置</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/character-config.js"></script>
+    <script src="./js/db.js"></script>
+    <script src="./js/character-editor.js"></script>
+    <script>
+        // 侧边栏控制
+        function openSidebar() {
+            document.getElementById('layerSidebar').classList.add('open');
+            document.getElementById('sidebarOverlay').classList.add('open');
+        }
+        
+        function closeSidebar() {
+            document.getElementById('layerSidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('open');
+        }
+    </script>
+</body>
+</html>

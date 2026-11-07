@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 修复工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover {
+            background: #e9ecef;
+            border-color: #764ba2;
+        }
+        .upload-area.dragover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .upload-text {
+            color: #666;
+            font-size: 16px;
+        }
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        #fileInput {
+            display: none;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            box-shadow: 0 5px 20px rgba(108, 117, 125, 0.4);
+        }
+        .preview-area {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            display: none;
+        }
+        .preview-area.show {
+            display: block;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .fixes-list {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .fixes-list h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .fixes-list ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .fixes-list li {
+            padding: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .fixes-list li:before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 JSON 修复工具</h1>
+        <p class="subtitle">修复备份文件中的格式错误，让导入更顺畅</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">点击或拖拽上传 JSON 文件</div>
+            <div class="upload-hint">支持 relationship-backup-*.json 格式的备份文件</div>
+        </div>
+        <input type="file" id="fileInput" accept=".json,application/json">
+        
+        <div id="status" class="status"></div>
+        
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="originalSize">-</div>
+                <div class="stat-label">原始大小</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="fixedSize">-</div>
+                <div class="stat-label">修复后大小</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="fixCount">-</div>
+                <div class="stat-label">修复项数</div>
+            </div>
+        </div>
+        
+        <div class="fixes-list" id="fixesList" style="display: none;">
+            <h3>本次修复内容：</h3>
+            <ul id="fixesUl"></ul>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn" id="downloadBtn" style="display: none;">
+                ⬇️ 下载修复后的文件
+            </button>
+            <button class="btn btn-secondary" id="clearBtn" style="display: none;">
+                🗑️ 清除
+            </button>
+        </div>
+        
+        <div class="preview-area" id="previewArea"></div>
+    </div>
+
+    <script>
+        let fixedContent = null;
+        let originalFileName = '';
+        
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const stats = document.getElementById('stats');
+        const fixesList = document.getElementById('fixesList');
+        const fixesUl = document.getElementById('fixesUl');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const previewArea = document.getElementById('previewArea');
+        
+        // 点击上传
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+        
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+        
+        function fixJSON(content) {
+            const fixes = [];
+            let fixed = content;
+            
+            // ========== 第0步：检测并转换旧格式数据 ==========
+            // 旧格式：直接包含 relationshipData 的内容（如 wechatChatList, chatMessages 等）
+            // 新格式：包含 relationshipData 字段的包装对象
+            try {
+                const tempData = JSON.parse(fixed);
+                
+                // 检测是否为旧格式：有直接包含 relationshipData 内容的特征字段，但没有 relationshipData 包装
+                const hasOldFormatFeatures = tempData.wechatChatList !== undefined || 
+                                              tempData.chatMessages !== undefined ||
+                                              tempData.startDate !== undefined ||
+                                              tempData.anniversaryName !== undefined;
+                const hasNewFormatWrapper = tempData.relationshipData !== undefined;
+                
+                if (hasOldFormatFeatures && !hasNewFormatWrapper) {
+                    fixes.push('检测到旧格式数据，已转换为新格式（添加 relationshipData 包装）');
+                    
+                    // 定义 relationshipData 应该包含的字段
+                    const relationshipDataFields = [
+                        'startDate', 'anniversaryName', 'name1', 'name2', 'avatar1', 'avatar2',
+                        'cardBg', 'topCardBg', 'dynamicImage', 'leftBubbleAvatar', 'rightBubbleAvatar',
+                        'mainBg', 'description', 'polaroidText', 'polaroidRotation', 'polaroidImage',
+                        'characterRelationships', 'chatMessages', 'wechatChatList', 'worldBooks',
+                        'studyRooms', 'diaryEntries', 'accountingData', 'footprintData',
+                        'coupleCardBackground', 'coupleCardHeaderBg', 'coupleCardHeaderStroke',
+                        'coupleCardFooterBg', 'theme', 'lastNoteContent', 'lastNoteTimestamp',
+                        'customPageContent', 'customPageTimestamp', 'customPageTitle'
+                    ];
+                    
+                    // 分离 relationshipData 字段和其他字段
+                    const relationshipData = {};
+                    const otherFields = {};
+                    
+                    for (const key of Object.keys(tempData)) {
+                        if (relationshipDataFields.includes(key)) {
+                            relationshipData[key] = tempData[key];
+                        } else {
+                            otherFields[key] = tempData[key];
+                        }
+                    }
+                    
+                    // 构建新格式数据
+                    const newFormatData = {
+                        relationshipData: relationshipData,
+                        timestamp: Date.now(),
+                        _exportInfo: {
+                            convertedFromOldFormat: true,
+                            convertedAt: new Date().toISOString()
+                        }
+                    };
+                    
+                    // 保留其他可能的字段（如 settings, presets 等）
+                    for (const [key, value] of Object.entries(otherFields)) {
+                        if (!newFormatData[key]) {
+                            newFormatData[key] = value;
+                        }
+                    }
+                    
+                    fixed = JSON.stringify(newFormatData);
+                    fixes.push('转换完成：已将旧格式数据包装为 relationshipData 字段');
+                }
+            } catch (e) {
+                // JSON 解析失败，继续尝试其他修复
+                console.log('旧格式检测需要进一步修复:', e.message);
+            }
+            
+            // ========== 第1-9步：常规 JSON 语法修复 ==========
+            
+            // 1. 修复 "key":, 这种缺失值的情况（最常见的问题）
+            const missingValueRegex = /"([^"]+)":\s*,/g;
+            let match;
+            while ((match = missingValueRegex.exec(content)) !== null) {
+                fixes.push(`修复缺失值: "${match[1]}":, → "${match[1]}":null,`);
+            }
+            fixed = fixed.replace(/"([^"]+)":\s*,/g, '"$1":null,');
+            
+            // 2. 修复 "key":} 或 "key":] 在行尾的情况
+            fixed = fixed.replace(/"([^"]+)":\s*([}\]])/g, '"$1":null$2');
+            
+            // 3. 修复 "key":, 后面跟属性名的情况
+            fixed = fixed.replace(/"([^"]+)":\s*(?=,\s*")/g, '"$1":null');
+            
+            // 4. 修复双逗号 ,,
+            const doubleCommaMatches = (fixed.match(/,,/g) || []).length;
+            if (doubleCommaMatches > 0) {
+                fixes.push(`修复双逗号: ${doubleCommaMatches} 处`);
+            }
+            fixed = fixed.replace(/,,+/g, ',');
+            
+            // 5. 修复尾随逗号
+            fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+            
+            // 6. 移除控制字符
+            const controlChars = fixed.match(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g);
+            if (controlChars) {
+                fixes.push(`移除控制字符: ${controlChars.length} 个`);
+            }
+            fixed = fixed.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+            
+            // 7. 修复未转义的换行符
+            fixed = fixed.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match, p1) => {
+                const fixedStr = p1.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                return '"' + fixedStr + '"';
+            });
+            
+            // 8. 修复 polaroidText 特殊问题
+            if (fixed.includes('"polaroidText":,')) {
+                fixes.push('修复 polaroidText 缺失值');
+                fixed = fixed.replace(/"polaroidText":,/g, '"polaroidText":null,');
+            }
+            
+            // 9. 修复 polaroidRotation 特殊问题
+            if (fixed.includes('"polaroidRotation":,')) {
+                fixes.push('修复 polaroidRotation 缺失值');
+                fixed = fixed.replace(/"polaroidRotation":,/g, '"polaroidRotation":null,');
+            }
+            
+            // ========== 第10步：再次尝试旧格式转换（在语法修复后） ==========
+            try {
+                const tempData = JSON.parse(fixed);
+                const hasOldFormatFeatures = tempData.wechatChatList !== undefined || 
+                                              tempData.chatMessages !== undefined ||
+                                              tempData.startDate !== undefined;
+                const hasNewFormatWrapper = tempData.relationshipData !== undefined;
+                
+                if (hasOldFormatFeatures && !hasNewFormatWrapper) {
+                    fixes.push('检测到旧格式数据（语法修复后），已转换为新格式');
+                    
+                    const relationshipDataFields = [
+                        'startDate', 'anniversaryName', 'name1', 'name2', 'avatar1', 'avatar2',
+                        'cardBg', 'topCardBg', 'dynamicImage', 'leftBubbleAvatar', 'rightBubbleAvatar',
+                        'mainBg', 'description', 'polaroidText', 'polaroidRotation', 'polaroidImage',
+                        'characterRelationships', 'chatMessages', 'wechatChatList', 'worldBooks',
+                        'studyRooms', 'diaryEntries', 'accountingData', 'footprintData',
+                        'coupleCardBackground', 'coupleCardHeaderBg', 'coupleCardHeaderStroke',
+                        'coupleCardFooterBg', 'theme', 'lastNoteContent', 'lastNoteTimestamp',
+                        'customPageContent', 'customPageTimestamp', 'customPageTitle'
+                    ];
+                    
+                    const relationshipData = {};
+                    const otherFields = {};
+                    
+                    for (const key of Object.keys(tempData)) {
+                        if (relationshipDataFields.includes(key)) {
+                            relationshipData[key] = tempData[key];
+                        } else {
+                            otherFields[key] = tempData[key];
+                        }
+                    }
+                    
+                    const newFormatData = {
+                        relationshipData: relationshipData,
+                        timestamp: Date.now(),
+                        _exportInfo: {
+                            convertedFromOldFormat: true,
+                            convertedAt: new Date().toISOString()
+                        }
+                    };
+                    
+                    for (const [key, value] of Object.entries(otherFields)) {
+                        if (!newFormatData[key]) {
+                            newFormatData[key] = value;
+                        }
+                    }
+                    
+                    fixed = JSON.stringify(newFormatData);
+                    fixes.push('转换完成：已将旧格式数据包装为 relationshipData 字段');
+                }
+            } catch (e) {
+                // 忽略解析错误
+            }
+            
+            return { fixed, fixes };
+        }
+        
+        function handleFile(file) {
+            originalFileName = file.name;
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    showStatus('正在修复文件...', 'info');
+                    
+                    const content = e.target.result;
+                    const originalSize = content.length;
+                    
+                    // 尝试解析原始 JSON
+                    try {
+                        JSON.parse(content);
+                        showStatus('✅ 文件格式正确，无需修复！', 'success');
+                        fixedContent = content;
+                        
+                        document.getElementById('originalSize').textContent = formatSize(originalSize);
+                        document.getElementById('fixedSize').textContent = formatSize(originalSize);
+                        document.getElementById('fixCount').textContent = '0';
+                        
+                        stats.style.display = 'grid';
+                        fixesList.style.display = 'none';
+                        downloadBtn.style.display = 'inline-block';
+                        clearBtn.style.display = 'inline-block';
+                        return;
+                    } catch (parseError) {
+                        // 需要修复
+                        console.log('原始文件解析失败，开始修复...');
+                    }
+                    
+                    // 修复 JSON
+                    const result = fixJSON(content);
+                    fixedContent = result.fixed;
+                    
+                    // 验证修复后的 JSON
+                    try {
+                        JSON.parse(fixedContent);
+                        showStatus('✅ 修复成功！文件已可以正常导入。', 'success');
+                        
+                        // 显示统计
+                        document.getElementById('originalSize').textContent = formatSize(originalSize);
+                        document.getElementById('fixedSize').textContent = formatSize(fixedContent.length);
+                        document.getElementById('fixCount').textContent = result.fixes.length;
+                        
+                        // 显示修复列表
+                        fixesUl.innerHTML = result.fixes.map(fix => `<li>${fix}</li>`).join('');
+                        
+                        stats.style.display = 'grid';
+                        fixesList.style.display = 'block';
+                        downloadBtn.style.display = 'inline-block';
+                        clearBtn.style.display = 'inline-block';
+                        
+                        // 显示预览
+                        previewArea.textContent = fixedContent.substring(0, 2000) + '...';
+                        previewArea.classList.add('show');
+                        
+                    } catch (fixError) {
+                        showStatus('❌ 修复失败：' + fixError.message, 'error');
+                        console.error(fixError);
+                    }
+                    
+                } catch (error) {
+                    showStatus('❌ 处理文件失败：' + error.message, 'error');
+                    console.error(error);
+                }
+            };
+            
+            reader.onerror = () => {
+                showStatus('❌ 读取文件失败', 'error');
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // 下载修复后的文件
+        downloadBtn.addEventListener('click', () => {
+            if (!fixedContent) return;
+            
+            const blob = new Blob([fixedContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            // 生成新的文件名
+            const baseName = originalFileName.replace('.json', '');
+            const newFileName = baseName + '-fixed.json';
+            
+            a.href = url;
+            a.download = newFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showStatus('✅ 文件已下载: ' + newFileName, 'success');
+        });
+        
+        // 清除
+        clearBtn.addEventListener('click', () => {
+            fixedContent = null;
+            originalFileName = '';
+            fileInput.value = '';
+            status.className = 'status';
+            status.textContent = '';
+            stats.style.display = 'none';
+            fixesList.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            clearBtn.style.display = 'none';
+            previewArea.classList.remove('show');
+        });
+    </script>
+</body>
+</html>

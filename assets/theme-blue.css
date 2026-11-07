@@ -1,0 +1,128 @@
+/* ============================================
+   主题 6：天空蓝风 💙
+   ============================================ */
+
+/* 微信页面背景 */
+.wechat-page {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+}
+
+/* 聊天列表背景 */
+.chat-list {
+    background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+}
+
+/* 聊天气泡 - 对方 */
+.message-bubble {
+    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2) !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+/* 聊天气泡 - 自己 */
+.message-container.user .message-bubble {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* 聊天列表项 */
+.chat-item {
+    background: rgba(255, 255, 255, 0.7) !important;
+    border-radius: 15px !important;
+    margin: 8px 15px !important;
+    padding: 12px 15px !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+}
+
+.chat-item:hover {
+    background: rgba(240, 249, 255, 0.9) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* 顶部导航栏 */
+.app-header {
+    background: linear-gradient(135deg, rgba(240, 249, 255, 0.95) 0%, rgba(224, 242, 254, 0.95) 100%) !important;
+    backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
+    box-shadow: 0 2px 15px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* 底部输入框区域 */
+.input-area {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-top: 1px solid rgba(59, 130, 246, 0.2) !important;
+    box-shadow: 0 -2px 15px rgba(59, 130, 246, 0.08) !important;
+}
+
+/* 输入框 */
+.input-area input {
+    background: rgba(240, 249, 255, 0.5) !important;
+    border: 2px solid rgba(59, 130, 246, 0.3) !important;
+    border-radius: 25px !important;
+    padding: 10px 20px !important;
+}
+
+.input-area input:focus {
+    border-color: rgba(59, 130, 246, 0.6) !important;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* 发送按钮 */
+.send-button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* 头像 */
+.avatar {
+    border-radius: 50% !important;
+    border: 3px solid rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.25) !important;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(240, 249, 255, 0.5) !important;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+    border-radius: 10px !important;
+}
+
+/* 特效 - 【流畅优化】减少动画对性能的影响 */
+@keyframes messageSend {
+    0% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+/* 【流畅优化】只对最新消息添加淡入动画，使用 will-change 优化 */
+.message-bubble {
+    /* 【流畅优化】移除默认动画，避免所有消息都有动画 */
+    /* animation: messageSend 0.3s ease-out !important; */
+}
+
+/* 【流畅优化】只对最近的消息添加动画 */
+.message-container:last-child .message-bubble {
+    animation: messageSend 0.2s ease-out !important;
+    will-change: opacity;
+}
+
+/* 【流畅优化】优化 transition，避免使用 all */
+.chat-item {
+    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.avatar:hover {
+    transform: rotate(360deg) scale(1.1) !important;
+    transition: all 0.6s ease !important;
+}

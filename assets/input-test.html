@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>输入框兼容性测试</title>
+    
+    <!-- 复制 index.html 中的输入框修复脚本 -->
+    <script>
+        (function() {
+            'use strict';
+            
+            const CONFIG = {
+                debug: true,
+                scrollDelay: 100,
+                resizeThrottle: 50
+            };
+            
+            function log(...args) {
+                if (CONFIG.debug) console.log('[输入框修复]', ...args);
+            }
+            
+            function detectPlatform() {
+                const ua = navigator.userAgent;
+                if (/iPad|iPhone|iPod/.test(ua)) return 'iOS';
+                if (/Android/.test(ua)) return 'Android';
+                if (/HarmonyOS/.test(ua)) return 'HarmonyOS';
+                return 'other';
+            }
+            
+            function detectBrand() {
+                const ua = navigator.userAgent;
+                if (/OnePlus|ONEPLUS/.test(ua)) return 'oneplus';
+                if (/OPPO|oppo/.test(ua)) return 'oppo';
+                if (/vivo|VIVO/.test(ua)) return 'vivo';
+                if (/Xiaomi|MI\s|Redmi/.test(ua)) return 'xiaomi';
+                if (/HUAWEI|HONOR/.test(ua)) return 'huawei';
+                if (/Samsung|SAMSUNG/.test(ua)) return 'samsung';
+                return 'other';
+            }
+            
+            const platform = detectPlatform();
+            const brand = detectBrand();
+            
+            let originalWindowHeight = window.innerHeight;
+            let keyboardHeight = 0;
+            let currentFocusElement = null;
+            
+            function scrollElementIntoView(element) {
+                if (!element) return;
+                const rect = element.getBoundingClientRect();
+                const visibleHeight = window.innerHeight - keyboardHeight;
+                
+                if (rect.bottom > visibleHeight - 20) {
+                    const scrollOffset = rect.bottom - visibleHeight + 100;
+                    window.scrollBy({ top: scrollOffset, behavior: 'smooth' });
+                }
+            }
+            
+            function handleInput() {
+                document.addEventListener('focusin', (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                        currentFocusElement = e.target;
+                        setTimeout(() => scrollElementIntoView(e.target), 100);
+                    }
+                });
+                
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', () => {
+                        keyboardHeight = window.innerHeight - window.visualViewport.height;
+                        if (keyboardHeight > 100 && currentFocusElement) {
+                            scrollElementIntoView(currentFocusElement);
+                        }
+                    });
+                }
+            }
+            
+            function enhanceInputs() {
+                document.querySelectorAll('input, textarea').forEach(input => {
+                    input.style.pointerEvents = 'auto';
+                    input.addEventListener('click', (e) => {
+                        e.target.focus();
+                        setTimeout(() => scrollElementIntoView(e.target), 100);
+                    });
+                });
+            }
+            
+            document.addEventListener('DOMContentLoaded', () => {
+                document.body.classList.add(platform.toLowerCase(), brand);
+                handleInput();
+                enhanceInputs();
+                log('平台:', platform, '品牌:', brand);
+            });
+            
+            window.InputFix = {
+                platform: platform,
+                brand: brand,
+                getKeyboardHeight: () => keyboardHeight
+            };
+        })();
+    </script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .device-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .test-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            -webkit-appearance: none;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .chat-section {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px 20px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 16px;
+        }
+        
+        .send-btn {
+            padding: 12px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .spacer {
+            height: 100px;
+        }
+        
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            font-size: 12px;
+            font-family: monospace;
+            z-index: 9999;
+            display: none;
+        }
+        
+        .status-bar.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-bar" id="statusBar"></div>
+    
+    <div class="header">
+        <h1>🧪 输入框兼容性测试</h1>
+        <div class="device-info" id="deviceInfo">检测中...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>基础输入测试</h2>
+        <div class="input-group">
+            <label>普通文本输入</label>
+            <input type="text" placeholder="点击输入文字...">
+        </div>
+        <div class="input-group">
+            <label>数字输入</label>
+            <input type="number" placeholder="输入数字...">
+        </div>
+        <div class="input-group">
+            <label>密码输入</label>
+            <input type="password" placeholder="输入密码...">
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>多行文本测试</h2>
+        <div class="input-group">
+            <label>长文本输入</label>
+            <textarea placeholder="输入多行文本..."></textarea>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>页面底部输入测试</h2>
+        <p style="color: #666; font-size: 14px;">向下滚动到底部，测试输入框是否会被键盘遮挡</p>
+    </div>
+    
+    <div class="spacer"></div>
+    
+    <!-- 底部聊天输入框 -->
+    <div class="chat-section">
+        <input type="text" class="chat-input" placeholder="输入消息...">
+        <button class="send-btn">发送</button>
+    </div>
+    
+    <script>
+        // 显示设备信息
+        function updateDeviceInfo() {
+            const info = window.InputFix;
+            document.getElementById('deviceInfo').innerHTML = `
+                平台: ${info.platform} | 
+                品牌: ${info.brand} | 
+                键盘高度: ${Math.round(info.getKeyboardHeight())}px
+            `;
+        }
+        
+        // 显示状态信息
+        function showStatus(msg) {
+            const bar = document.getElementById('statusBar');
+            bar.textContent = msg;
+            bar.classList.add('visible');
+            setTimeout(() => bar.classList.remove('visible'), 3000);
+        }
+        
+        // 监听输入框事件
+        document.querySelectorAll('input, textarea').forEach(input => {
+            input.addEventListener('focus', () => {
+                showStatus(`✅ 输入框已聚焦: ${input.placeholder || input.type}`);
+                updateDeviceInfo();
+            });
+        });
+        
+        // 定期更新信息
+        setInterval(updateDeviceInfo, 1000);
+        updateDeviceInfo();
+        
+        // 发送按钮测试
+        document.querySelector('.send-btn').addEventListener('click', () => {
+            const input = document.querySelector('.chat-input');
+            if (input.value) {
+                showStatus(`📤 发送: ${input.value}`);
+                input.value = '';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>健康助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(180deg, #fff9f5 0%, #fff5f0 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* 顶栏 */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: linear-gradient(135deg, #ffe4d6 0%, #ffd5c8 100%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 30px 15px 0;
+            box-shadow: 0 2px 20px rgba(255, 160, 140, 0.25);
+        }
+        
+        .topbar-back {
+            font-size: 28px;
+            color: #8b5a4a;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        
+        .topbar-back:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .topbar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #8b5a4a;
+        }
+        
+        .topbar-settings {
+            background: rgba(255,255,255,0.4);
+            border: none;
+            color: #8b5a4a;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .topbar-settings:hover {
+            background: rgba(255,255,255,0.6);
+        }
+        
+        /* 内容区域 */
+        .content {
+            padding: 95px 15px 85px;
+            min-height: 100vh;
+        }
+        
+        /* 状态卡片 */
+        .status-card {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border-radius: 24px;
+            padding: 24px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(255, 160, 140, 0.15);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 200, 180, 0.3);
+        }
+        
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ffb4a2, #ffcdd2, #f8bbd9);
+        }
+        
+        .status-phase {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #a1887f 0%, #8d6e63 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .status-phase.menstruation {
+            background: linear-gradient(135deg, #e57373 0%, #ef5350 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .status-cycle {
+            font-size: 14px;
+            color: #a1887f;
+            margin-bottom: 12px;
+        }
+        
+        .status-text {
+            font-size: 14px;
+            color: #bcaaa4;
+            padding: 10px 0;
+        }
+        
+        .next-prediction {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px dashed #ffe0d6;
+            font-size: 13px;
+            color: #a1887f;
+        }
+        
+        .next-prediction span {
+            color: #e57373;
+            font-weight: 600;
+        }
+        
+        /* 日历容器 */
+        .calendar-container {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(255, 160, 140, 0.15);
+            border: 1px solid rgba(255, 200, 180, 0.3);
+        }
+        
+        .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+        
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .nav-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f0ed;
+            color: #8d6e63;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+        }
+        
+        .calendar-month {
+            font-size: 18px;
+            font-weight: 600;
+            color: #5d4037;
+            min-width: 120px;
+            text-align: center;
+        }
+        
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .calendar-weekdays div {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #a1887f;
+            padding: 8px 4px;
+        }
+        
+        .calendar-weekdays div.weekend {
+            color: #c75b5b;
+        }
+        
+        .calendar-days {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .week-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            position: relative;
+            background: #fff5f0;
+        }
+        
+        .calendar-day:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 160, 140, 0.2);
+        }
+        
+        .calendar-day.empty {
+            cursor: default;
+            background: transparent;
+        }
+        
+        .calendar-day.today {
+            border-color: #ffab91;
+            border-width: 2px;
+            font-weight: 700;
+            background: #fff;
+        }
+        
+        .calendar-day.phase-menstruation {
+            background: linear-gradient(135deg, #ffab91 0%, #ff8a65 100%);
+            border-color: #ff7043;
+            box-shadow: 0 4px 12px rgba(255, 112, 67, 0.3);
+        }
+        
+        .calendar-day.phase-menstruation .day-number {
+            color: #fff;
+            font-weight: 600;
+        }
+        
+        .calendar-day.phase-menstruation.predicted {
+            background: linear-gradient(135deg, #ffccbc 0%, #ffab91 100%);
+            border: 2px dashed #ff8a65;
+        }
+        
+        .calendar-day.phase-menstruation.predicted .day-number {
+            color: #e64a19;
+        }
+        
+        .calendar-day.phase-luteal {
+            background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
+            border-color: #ffb74d;
+        }
+        
+        .calendar-day.phase-ovulation {
+            background: linear-gradient(135deg, #ce93d8 0%, #ba68c8 100%);
+            border-color: #ab47bc;
+            box-shadow: 0 4px 12px rgba(186, 104, 200, 0.3);
+        }
+        
+        .calendar-day.phase-ovulation .day-number {
+            color: #fff;
+            font-weight: 700;
+        }
+        
+        .calendar-day.phase-ovulation::after {
+            content: '✦';
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            font-size: 10px;
+            color: #fff;
+        }
+        
+        .calendar-day.phase-fertile {
+            background: linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%);
+            border-color: #ba68c8;
+        }
+        
+        .calendar-day.phase-follicular {
+            background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+            border-color: #81c784;
+        }
+        
+        .calendar-day.has-record::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            width: 4px;
+            height: 4px;
+            background: #ff8a65;
+            border-radius: 50%;
+        }
+        
+        .day-number {
+            font-size: 14px;
+            color: #6d4c41;
+            font-weight: 500;
+            z-index: 1;
+        }
+        
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+            padding: 16px;
+            background: #fff5f0;
+            border-radius: 16px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #8d6e63;
+            padding: 6px 12px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+        
+        /* 记录面板 */
+        .record-panel {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border-radius: 24px;
+            padding: 24px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(255, 160, 140, 0.15);
+            display: none;
+            border: 1px solid rgba(255, 200, 180, 0.3);
+        }
+        
+        .record-date {
+            font-size: 16px;
+            font-weight: 600;
+            color: #6d4c41;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #ffe8e0;
+        }
+        
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #fff0eb;
+            cursor: pointer;
+        }
+        
+        .record-item:last-child {
+            border-bottom: none;
+        }
+        
+        .record-label {
+            font-size: 15px;
+            color: #6d4c41;
+            font-weight: 500;
+        }
+        
+        .record-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        
+        .no-data {
+            font-size: 13px;
+            color: #bcaaa4;
+        }
+        
+        /* 开关 */
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 30px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ffccbc;
+            transition: .4s;
+            border-radius: 30px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        .toggle input:checked + .toggle-slider {
+            background-color: #ff8a65;
+        }
+        
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+        
+        /* 标签 */
+        .tag {
+            background: linear-gradient(135deg, #ffccbc 0%, #ffab91 100%);
+            color: #6d4c41;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        
+        .mood-tag {
+            background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+            color: #4a7c4e;
+        }
+        
+        /* 底栏 */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -4px 20px rgba(255, 160, 140, 0.15);
+            z-index: 100;
+            border-top: 1px solid rgba(255, 200, 180, 0.3);
+        }
+        
+        .bottom-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            height: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.6;
+        }
+        
+        .bottom-item.active {
+            opacity: 1;
+        }
+        
+        .bottom-item.active .bottom-icon {
+            transform: scale(1.1);
+        }
+        
+        .bottom-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .bottom-label {
+            font-size: 11px;
+            color: #a1887f;
+            transition: all 0.3s ease;
+        }
+        
+        /* 弹窗 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 200;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border-radius: 24px 24px 0 0;
+            width: 100%;
+            max-height: 85%;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid #ffe8e0;
+        }
+        
+        .modal-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #6d4c41;
+            margin: 0;
+        }
+        
+        .modal-close {
+            font-size: 28px;
+            color: #bcaaa4;
+            cursor: pointer;
+        }
+        
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            max-height: 400px;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px 24px;
+            border-top: 1px solid #ffe8e0;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #ff8a65 0%, #ff7043 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(255, 112, 67, 0.3);
+        }
+        
+        /* 症状网格 */
+        .symptoms-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        
+        .symptom-option {
+            padding: 14px 8px;
+            background: #fff5f0;
+            border-radius: 14px;
+            text-align: center;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            color: #6d4c41;
+        }
+        
+        .symptom-option.selected {
+            background: linear-gradient(135deg, #ffccbc 0%, #ffab91 100%);
+            border-color: #ff8a65;
+        }
+        
+        /* 心情网格 */
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        
+        .mood-option {
+            padding: 16px;
+            background: #fff5f0;
+            border-radius: 16px;
+            text-align: center;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            color: #6d4c41;
+        }
+        
+        .mood-option.selected {
+            background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+            border-color: #81c784;
+            color: #4a7c4e;
+        }
+        
+        /* 设置表单 */
+        .settings-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .form-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-item label {
+            font-size: 14px;
+            color: #a1887f;
+            font-weight: 500;
+        }
+        
+        .form-item input, .form-item select {
+            padding: 14px 16px;
+            border: 1px solid #ffd5c8;
+            border-radius: 14px;
+            font-size: 15px;
+            background: #fff8f5;
+            color: #6d4c41;
+        }
+        
+        /* 每日检测弹窗 */
+        .check-modal .modal-content {
+            max-height: 60%;
+        }
+        
+        .check-content {
+            text-align: center;
+            padding: 30px 10px;
+        }
+        
+        .check-icon {
+            font-size: 56px;
+            margin-bottom: 20px;
+        }
+        
+        .check-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #6d4c41;
+            margin-bottom: 12px;
+        }
+        
+        .check-desc {
+            font-size: 14px;
+            color: #a1887f;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+        
+        .check-buttons {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .check-btn {
+            flex: 1;
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+        
+        .check-btn.yes {
+            background: linear-gradient(135deg, #ff8a65 0%, #ff7043 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(255, 112, 67, 0.3);
+        }
+        
+        .check-btn.no {
+            background: #fff5f0;
+            color: #8d6e63;
+        }
+        
+        /* 喝水页面样式 */
+        .water-info-card {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border-radius: 24px;
+            padding: 24px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(255, 160, 140, 0.15);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            cursor: pointer;
+            border: 1px solid rgba(255, 200, 180, 0.3);
+        }
+        
+        .water-info-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .water-info-label {
+            font-size: 12px;
+            color: #bcaaa4;
+        }
+        
+        .water-info-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #4fc3f7;
+        }
+        
+        .water-wave-container {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin: 30px auto;
+            border-radius: 50%;
+            background: #fff5f0;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(255, 160, 140, 0.1);
+        }
+        
+        .water-wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, #81d4fa 0%, #4fc3f7 100%);
+            transition: height 0.5s ease;
+        }
+        
+        /* 静态水波纹效果，无动画 */
+        .water-wave::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            border-radius: 50%;
+        }
+        
+        .water-wave-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+        }
+        
+        .water-percentage {
+            font-size: 36px;
+            font-weight: 700;
+            color: #6d4c41;
+        }
+        
+        .water-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .water-btn {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border: 2px solid #ffd5c8;
+            border-radius: 16px;
+            padding: 16px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .water-btn:hover {
+            border-color: #4fc3f7;
+            background: linear-gradient(135deg, #e1f5fe 0%, #b3e5fc 100%);
+        }
+        
+        /* 疾病页面样式 */
+        .disease-section {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8f5 100%);
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(255, 160, 140, 0.15);
+            border: 1px solid rgba(255, 200, 180, 0.3);
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #6d4c41;
+        }
+        
+        .add-btn {
+            background: linear-gradient(135deg, #ff8a65 0%, #ff7043 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 112, 67, 0.3);
+        }
+        
+        .disease-item {
+            background: #fff5f0;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .disease-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #6d4c41;
+            margin-bottom: 6px;
+        }
+        
+        .disease-type {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 10px;
+            background: #ffccbc;
+            color: #8b5a4a;
+            display: inline-block;
+        }
+        
+        .medication-tag {
+            font-size: 11px;
+            padding: 4px 10px;
+            background: white;
+            border-radius: 10px;
+            color: #a1887f;
+            margin-top: 8px;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: #fff5f0;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        
+        .check-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid #ffccbc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: white;
+        }
+        
+        .check-item.checked .check-box {
+            background: #ff8a65;
+            border-color: #ff8a65;
+        }
+        
+        .check-info {
+            flex: 1;
+        }
+        
+        .check-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #6d4c41;
+        }
+        
+        .check-time {
+            font-size: 12px;
+            color: #bcaaa4;
+        }
+        
+        /* 隐藏页面 */
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶栏 -->
+    <div class="topbar">
+        <div class="topbar-back" onclick="goBack()">‹</div>
+        <div class="topbar-title">健康助手</div>
+        <button class="topbar-settings" onclick="openSettings()">⚙️ 设置</button>
+    </div>
+
+    <!-- 内容区域 -->
+    <div class="content">
+        <!-- 月经记录页面 -->
+        <div id="periodTab" class="tab-content active">
+            <div class="status-card">
+                <div id="periodStatus">
+                    <div class="status-text">请先设置最近一次月经日期</div>
+                </div>
+            </div>
+
+            <div class="calendar-container">
+                <div id="periodCalendar"></div>
+            </div>
+
+            <div id="recordPanel" class="record-panel">
+                <div class="record-date">选中日期：<span id="selectedDate"></span></div>
+                
+                <div class="record-item">
+                    <div class="record-label">今天来月经了吗？</div>
+                    <label class="toggle">
+                        <input type="checkbox" id="periodToggle" onchange="togglePeriod(this)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="record-item" onclick="openSymptomsModal()">
+                    <div class="record-label">经期情况</div>
+                    <div id="symptomsDisplay" class="record-value">
+                        <span class="no-data">点击选择症状</span>
+                    </div>
+                </div>
+
+                <div class="record-item" onclick="openMoodModal()">
+                    <div class="record-label">今天心情</div>
+                    <div id="moodDisplay" class="record-value">
+                        <span class="no-data">点击选择心情</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 喝水页面 -->
+        <div id="waterTab" class="tab-content">
+            <div class="water-info-card" onclick="openWeightSettings()">
+                <div class="water-info-item">
+                    <span class="water-info-label">目前体重</span>
+                    <span class="water-info-value"><span id="waterWeight">50</span> kg</span>
+                </div>
+                <div class="water-info-item">
+                    <span class="water-info-label">今日目标</span>
+                    <span class="water-info-value"><span id="waterGoal">1750</span> ml</span>
+                </div>
+                <div class="water-info-item">
+                    <span class="water-info-label">已摄入</span>
+                    <span class="water-info-value"><span id="currentIntake">0</span> ml</span>
+                </div>
+                <div class="water-info-item">
+                    <span class="water-info-label">当前应摄入</span>
+                    <span class="water-info-value"><span id="expectedIntake">0</span> ml</span>
+                </div>
+            </div>
+
+            <div class="water-wave-container">
+                <div id="waterWave" class="water-wave" style="height: 0%;"></div>
+                <div class="water-wave-text">
+                    <div id="waterPercentage" class="water-percentage">0%</div>
+                    <div style="font-size: 12px; color: #8d6e63;">今日完成度</div>
+                </div>
+            </div>
+
+            <div class="water-buttons">
+                <button class="water-btn" onclick="addWater(200)">
+                    <span style="font-size: 24px;">💧</span>
+                    <span style="font-size: 16px; font-weight: 600; color: #5d4037;">200ml</span>
+                    <span style="font-size: 11px; color: #a1887f;">水</span>
+                </button>
+                <button class="water-btn" onclick="addWater(300)">
+                    <span style="font-size: 24px;">💧</span>
+                    <span style="font-size: 16px; font-weight: 600; color: #5d4037;">300ml</span>
+                    <span style="font-size: 11px; color: #a1887f;">水</span>
+                </button>
+                <button class="water-btn" onclick="addWater(500)">
+                    <span style="font-size: 24px;">💧</span>
+                    <span style="font-size: 16px; font-weight: 600; color: #5d4037;">500ml</span>
+                    <span style="font-size: 11px; color: #a1887f;">水</span>
+                </button>
+            </div>
+
+            <div class="disease-section">
+                <div class="section-header">
+                    <span class="section-title">📝 今日记录</span>
+                </div>
+                <div id="waterRecords"></div>
+            </div>
+        </div>
+
+        <!-- 疾病页面 -->
+        <div id="diseaseTab" class="tab-content">
+            <div class="disease-section">
+                <div class="section-header">
+                    <span class="section-title">📋 疾病管理</span>
+                    <button class="add-btn" onclick="openDiseaseModal()">+ 添加疾病</button>
+                </div>
+                <div id="diseaseList"></div>
+            </div>
+
+            <div class="disease-section">
+                <div class="section-header">
+                    <span class="section-title">💊 今日用药打卡</span>
+                    <span id="medicationProgress" style="font-size: 14px; font-weight: 600; color: #5d9ea0;">0/0</span>
+                </div>
+                <div id="medicationList"></div>
+            </div>
+
+            <div class="disease-section">
+                <div class="section-header">
+                    <span class="section-title">📝 症状记录</span>
+                    <button class="add-btn" onclick="openSymptomModal()">+ 记录症状</button>
+                </div>
+                <div id="symptomList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底栏 -->
+    <div class="bottom-bar">
+        <div class="bottom-item active" onclick="switchTab('period')">
+            <div class="bottom-icon">🌸</div>
+            <div class="bottom-label">月经记录</div>
+        </div>
+        <div class="bottom-item" onclick="switchTab('water')">
+            <div class="bottom-icon">💧</div>
+            <div class="bottom-label">喝水情况</div>
+        </div>
+        <div class="bottom-item" onclick="switchTab('disease')">
+            <div class="bottom-icon">🏥</div>
+            <div class="bottom-label">目前疾病</div>
+        </div>
+    </div>
+
+    <!-- 症状弹窗 -->
+    <div id="symptomsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择经期症状</h3>
+                <span class="modal-close" onclick="closeSymptomsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="symptoms-grid">
+                    <div class="symptom-option" data-value="量少">🩸 量少</div>
+                    <div class="symptom-option" data-value="量多">🩸 量多</div>
+                    <div class="symptom-option" data-value="鲜红">🔴 鲜红</div>
+                    <div class="symptom-option" data-value="暗红">🟤 暗红</div>
+                    <div class="symptom-option" data-value="轻微痛">😣 轻微痛</div>
+                    <div class="symptom-option" data-value="剧痛">😫 剧痛</div>
+                    <div class="symptom-option" data-value="腰痛">😖 腰痛</div>
+                    <div class="symptom-option" data-value="头痛">🤕 头痛</div>
+                    <div class="symptom-option" data-value="失眠">😵 失眠</div>
+                    <div class="symptom-option" data-value="嗜睡">😴 嗜睡</div>
+                    <div class="symptom-option" data-value="痘痘">🔴 痘痘</div>
+                    <div class="symptom-option" data-value="乳房胀痛">🎈 乳房胀痛</div>
+                    <div class="symptom-option" data-value="腹胀">🎈 腹胀</div>
+                    <div class="symptom-option" data-value="腹泻">💩 腹泻</div>
+                    <div class="symptom-option" data-value="便秘">🚫 便秘</div>
+                    <div class="symptom-option" data-value="恶心">🤢 恶心</div>
+                    <div class="symptom-option" data-value="布洛芬">💊 布洛芬</div>
+                    <div class="symptom-option" data-value="中药">🌿 中药</div>
+                    <div class="symptom-option" data-value="暖宝宝">🔥 暖宝宝</div>
+                    <div class="symptom-option" data-value="红糖水">🍵 红糖水</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="saveSymptoms()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 心情弹窗 -->
+    <div id="moodModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择今天心情</h3>
+                <span class="modal-close" onclick="closeMoodModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="mood-grid">
+                    <div class="mood-option" data-value="开心">😊 开心</div>
+                    <div class="mood-option" data-value="平静">😌 平静</div>
+                    <div class="mood-option" data-value="疲惫">😴 疲惫</div>
+                    <div class="mood-option" data-value="焦虑">😰 焦虑</div>
+                    <div class="mood-option" data-value="烦躁">😤 烦躁</div>
+                    <div class="mood-option" data-value="难过">😢 难过</div>
+                    <div class="mood-option" data-value="生气">😠 生气</div>
+                    <div class="mood-option" data-value="兴奋">🤩 兴奋</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="saveMood()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>周期设置</h3>
+                <span class="modal-close" onclick="closeSettings()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="settings-form">
+                    <div class="form-item">
+                        <label>最近一次月经开始日期</label>
+                        <input type="date" id="lastPeriodDate">
+                    </div>
+                    <div class="form-item">
+                        <label>平均周期长度（天）</label>
+                        <input type="number" id="cycleLength" min="21" max="35" value="28">
+                    </div>
+                    <div class="form-item">
+                        <label>经期长度（天）</label>
+                        <input type="number" id="periodLength" min="3" max="7" value="5">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="saveSettings()">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 体重设置弹窗 -->
+    <div id="weightModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>设置体重</h3>
+                <span class="modal-close" onclick="closeWeightModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="settings-form">
+                    <div class="form-item">
+                        <label>体重 (kg)</label>
+                        <input type="number" id="weightInput" min="30" max="150" step="0.1" value="50">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="saveWeight()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 数据存储 ====================
+        // 使用与 index.html 兼容的键名，以便 API 调用时能够获取数据
+        const Storage = {
+            get(key) {
+                // 兼容旧版 health_ 前缀和新版标准键名
+                let data = localStorage.getItem(key + 'Data');
+                if (!data) {
+                    // 尝试读取旧版格式
+                    data = localStorage.getItem('health_' + key);
+                }
+                return data ? JSON.parse(data) : null;
+            },
+            set(key, value) {
+                // 保存到标准键名，以便 index.html 可以读取
+                localStorage.setItem(key + 'Data', JSON.stringify(value));
+                // 同时保存到旧版键名，以便兼容
+                localStorage.setItem('health_' + key, JSON.stringify(value));
+                
+                // 【新增】触发自定义事件，通知 index.html 数据已更新
+                try {
+                    const event = new CustomEvent('healthDataUpdated', { 
+                        detail: { key: key + 'Data', timestamp: Date.now() } 
+                    });
+                    window.dispatchEvent(event);
+                    console.log(`[Health] 数据已更新并发送事件: ${key + 'Data'}`);
+                } catch (e) {
+                    console.warn('[Health] 发送更新事件失败:', e);
+                }
+            }
+        };
+
+        // ==================== 月经记录系统 ====================
+        let periodData = {
+            cycles: [],
+            currentCycle: null,
+            cycleLength: 28,
+            periodLength: 5,
+            records: {},
+            lastCheckDate: null,
+            predictions: [],
+            postponements: []
+        };
+
+        function loadPeriodData() {
+            const data = Storage.get('period');
+            if (data) {
+                periodData = { ...periodData, ...data };
+                if (!periodData.postponements) periodData.postponements = [];
+            }
+        }
+
+        function savePeriodData() {
+            // 添加 lastPeriodDate 字段以兼容 index.html 的 getHealthDataForAI 函数
+            const dataToSave = {
+                ...periodData,
+                lastPeriodDate: periodData.currentCycle?.startDate || null
+            };
+            Storage.set('period', dataToSave);
+        }
+
+        function calculateAverageCycleLength() {
+            if (periodData.cycles.length >= 2) {
+                let total = 0, count = 0;
+                for (let i = 1; i < periodData.cycles.length; i++) {
+                    const prev = new Date(periodData.cycles[i - 1].startDate);
+                    const curr = new Date(periodData.cycles[i].startDate);
+                    const diff = Math.floor((curr - prev) / (1000 * 60 * 60 * 24));
+                    if (diff >= 21 && diff <= 35) {
+                        total += diff;
+                        count++;
+                    }
+                }
+                if (count > 0) return Math.round(total / count);
+            }
+            return periodData.cycleLength;
+        }
+
+        function calculatePredictions() {
+            periodData.predictions = [];
+            const avgLength = calculateAverageCycleLength();
+            let lastStart = periodData.currentCycle?.startDate;
+            if (!lastStart && periodData.cycles.length > 0) {
+                lastStart = periodData.cycles[periodData.cycles.length - 1].startDate;
+            }
+            if (!lastStart) return;
+
+            let nextDate = new Date(lastStart);
+            const totalPostpone = periodData.postponements.reduce((sum, p) => sum + p.days, 0);
+            nextDate.setDate(nextDate.getDate() + avgLength + totalPostpone);
+
+            for (let i = 0; i < 6; i++) {
+                const periodStart = new Date(nextDate);
+                const periodEnd = new Date(nextDate);
+                periodEnd.setDate(periodEnd.getDate() + periodData.periodLength - 1);
+                
+                // 计算这个预测周期的排卵日
+                // 周期开始日期 = 经期开始日期 - 周期长度
+                // 排卵日 = 周期开始日期 + (周期长度 - 14)
+                const cycleStart = new Date(periodStart);
+                cycleStart.setDate(cycleStart.getDate() - avgLength);
+                const ovulationDate = new Date(cycleStart);
+                ovulationDate.setDate(ovulationDate.getDate() + (avgLength - 14));
+                
+                periodData.predictions.push({
+                    startDate: formatDate(periodStart),
+                    endDate: formatDate(periodEnd),
+                    ovulationDate: formatDate(ovulationDate),
+                    isPredicted: true
+                });
+                nextDate.setDate(nextDate.getDate() + avgLength);
+            }
+        }
+
+        function getCyclePhase(date) {
+            const target = new Date(date);
+            target.setHours(0, 0, 0, 0);
+
+            // 检查历史周期
+            for (const cycle of periodData.cycles) {
+                const start = parseDate(cycle.startDate);
+                const end = parseDate(cycle.endDate) || start;
+                // cycle.endDate 已经是计算好的结束日期，不需要再加天数
+                if (target >= start && target <= end) {
+                    return { phase: 'menstruation', label: '经期', isHistorical: true };
+                }
+            }
+
+            // 检查当前周期
+            if (periodData.currentCycle) {
+                const start = parseDate(periodData.currentCycle.startDate);
+                const end = new Date(start);
+                end.setDate(end.getDate() + periodData.periodLength - 1);
+                if (target >= start && target <= end) {
+                    return { phase: 'menstruation', label: '经期', isCurrent: true };
+                }
+
+                const daysSince = Math.floor((target - start) / 86400000);
+                const avgLength = calculateAverageCycleLength();
+                const ovulationDay = avgLength - 14;
+                
+                // 计算下一个经期开始日期（当前周期开始 + 周期长度）
+                const nextPeriodStart = new Date(start);
+                nextPeriodStart.setDate(nextPeriodStart.getDate() + avgLength);
+
+                // 只处理在当前周期范围内（到下一个经期开始前）的日期
+                if (daysSince > 0 && target < nextPeriodStart) {
+                    if (daysSince >= ovulationDay - 5 && daysSince <= ovulationDay + 4) {
+                        // 易孕期：排卵日前5天到后4天
+                        if (daysSince === ovulationDay) {
+                            return { phase: 'ovulation', label: '排卵日', isCurrent: true };
+                        }
+                        return { phase: 'fertile', label: '易孕期', isCurrent: true };
+                    } else if (daysSince > ovulationDay + 4) {
+                        // 黄体期：排卵日后4天之后到经期前
+                        return { phase: 'luteal', label: '黄体期', isCurrent: true };
+                    } else {
+                        // 卵泡期：经期结束到排卵日前5天
+                        return { phase: 'follicular', label: '卵泡期', isCurrent: true };
+                    }
+                }
+            }
+
+            // 检查预测 - 基于预测周期计算完整阶段
+            const avgLength = calculateAverageCycleLength();
+            
+            // 第一步：检查所有预测的经期
+            for (const pred of periodData.predictions) {
+                const periodStart = parseDate(pred.startDate);
+                const periodEnd = parseDate(pred.endDate);
+                
+                if (target >= periodStart && target <= periodEnd) {
+                    return { phase: 'menstruation', label: '预测经期', isPredicted: true };
+                }
+            }
+            
+            // 第二步：检查所有预测周期的阶段（经期之外的日期）
+            for (const pred of periodData.predictions) {
+                const periodStart = parseDate(pred.startDate);
+                
+                // 计算这个预测周期的开始日期（经期开始往前推一个周期长度）
+                const cycleStart = new Date(periodStart);
+                cycleStart.setDate(cycleStart.getDate() - avgLength);
+                
+                // 检查目标日期是否在这个预测周期内（且不在经期内）
+                if (target >= cycleStart && target < periodStart) {
+                    // 计算距离周期开始的天数
+                    const daysSinceCycleStart = Math.floor((target - cycleStart) / 86400000);
+                    // 排卵日通常是周期第 (avgLength - 14) 天
+                    const ovulationDay = avgLength - 14;
+                    
+                    if (daysSinceCycleStart >= ovulationDay - 5 && daysSinceCycleStart <= ovulationDay + 4) {
+                        // 易孕期：排卵日前5天到后4天
+                        if (daysSinceCycleStart === ovulationDay) {
+                            return { phase: 'ovulation', label: '预测排卵', isPredicted: true };
+                        }
+                        return { phase: 'fertile', label: '预测易孕', isPredicted: true };
+                    } else if (daysSinceCycleStart > ovulationDay + 4) {
+                        // 黄体期：排卵日后4天之后到经期前
+                        return { phase: 'luteal', label: '预测黄体期', isPredicted: true };
+                    } else {
+                        // 卵泡期：周期开始到排卵日前5天
+                        return { phase: 'follicular', label: '预测卵泡期', isPredicted: true };
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        let currentCalendarDate = new Date();
+
+        function renderCalendar() {
+            const container = document.getElementById('periodCalendar');
+            const year = currentCalendarDate.getFullYear();
+            const month = currentCalendarDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startDayOfWeek = firstDay.getDay();
+            const today = new Date();
+
+            let html = `
+                <div class="calendar-header">
+                    <div class="calendar-nav">
+                        <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+                        <div class="calendar-month">${year}年${month + 1}月</div>
+                        <button class="nav-btn" onclick="changeMonth(1)">›</button>
+                    </div>
+                </div>
+                <div class="calendar-weekdays">
+                    <div class="weekend">日</div>
+                    <div>一</div>
+                    <div>二</div>
+                    <div>三</div>
+                    <div>四</div>
+                    <div>五</div>
+                    <div class="weekend">六</div>
+                </div>
+                <div class="calendar-days">
+            `;
+
+            let weekHtml = '<div class="week-row">';
+            for (let i = 0; i < startDayOfWeek; i++) {
+                weekHtml += '<div class="calendar-day empty"></div>';
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const dateStr = formatDate(date);
+                const isToday = date.toDateString() === today.toDateString();
+                const phase = getCyclePhase(date);
+                const record = periodData.records[dateStr];
+
+                let dayClass = 'calendar-day';
+                if (isToday) dayClass += ' today';
+                if (phase) {
+                    dayClass += ` phase-${phase.phase}`;
+                    if (phase.isPredicted) dayClass += ' predicted';
+                }
+                if (record?.symptoms?.length || record?.mood) dayClass += ' has-record';
+
+                weekHtml += `<div class="${dayClass}" onclick="selectDate('${dateStr}')"><span class="day-number">${day}</span></div>`;
+
+                if ((startDayOfWeek + day) % 7 === 0 || day === daysInMonth) {
+                    if (day === daysInMonth) {
+                        const remaining = 7 - ((startDayOfWeek + day) % 7);
+                        if (remaining < 7) {
+                            for (let i = 0; i < remaining; i++) weekHtml += '<div class="calendar-day empty"></div>';
+                        }
+                    }
+                    weekHtml += '</div>';
+                    html += weekHtml;
+                    if (day < daysInMonth) weekHtml = '<div class="week-row">';
+                }
+            }
+
+            html += '</div>';
+            html += `
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ffab91, #ff8a65); border-color: #ff7043;"></div><span>经期</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #c8e6c9, #a5d6a7); border-color: #81c784;"></div><span>卵泡期</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #e1bee7, #ce93d8); border-color: #ba68c8;"></div><span>易孕期</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ce93d8, #ba68c8); border-color: #ab47bc;"></div><span>排卵日</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ffe0b2, #ffcc80); border-color: #ffb74d;"></div><span>黄体期</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ffccbc, #ffab91); border: 2px dashed #ff8a65;"></div><span>预测</span></div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function changeMonth(delta) {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function selectDate(dateStr) {
+            document.getElementById('selectedDate').textContent = dateStr;
+            document.getElementById('recordPanel').style.display = 'block';
+            const record = periodData.records[dateStr] || {};
+            const phase = getCyclePhase(dateStr);
+            document.getElementById('periodToggle').checked = record.hasPeriod || (phase?.phase === 'menstruation');
+            updateSymptomsDisplay(record.symptoms || []);
+            updateMoodDisplay(record.mood || '');
+        }
+
+        function updateStatus() {
+            const statusEl = document.getElementById('periodStatus');
+            if (!periodData.currentCycle && periodData.cycles.length === 0) {
+                statusEl.innerHTML = '<div class="status-text">请先设置最近一次月经日期</div>';
+                return;
+            }
+
+            const today = new Date();
+            const phase = getCyclePhase(today);
+            let html = '';
+
+            if (phase) {
+                html += `<div class="status-phase ${phase.phase}">${phase.label}</div>`;
+                
+                let cycleStart = periodData.currentCycle ? new Date(periodData.currentCycle.startDate) : null;
+                if (!cycleStart && periodData.cycles.length > 0) {
+                    cycleStart = new Date(periodData.cycles[periodData.cycles.length - 1].startDate);
+                }
+                
+                if (cycleStart) {
+                    const daysSince = Math.floor((today - cycleStart) / 86400000) + 1;
+                    html += `<div class="status-cycle">周期第 ${daysSince} 天</div>`;
+                }
+
+                if (periodData.predictions.length > 0) {
+                    const next = periodData.predictions[0];
+                    const nextDate = new Date(next.startDate);
+                    const daysUntil = Math.floor((nextDate - today) / 86400000);
+                    
+                    if (daysUntil > 0) {
+                        html += `<div class="next-prediction">预计下次月经：<span>${daysUntil} 天后</span> (${next.startDate})</div>`;
+                    } else if (daysUntil === 0) {
+                        html += `<div class="next-prediction">预计<span>今天</span>来月经</div>`;
+                    } else {
+                        html += `<div class="next-prediction">预计经期已延后：<span>${Math.abs(daysUntil)} 天</span></div>`;
+                    }
+                }
+            }
+
+            statusEl.innerHTML = html;
+        }
+
+        function togglePeriod(checkbox) {
+            const dateStr = document.getElementById('selectedDate').textContent;
+            if (!periodData.records[dateStr]) periodData.records[dateStr] = {};
+            periodData.records[dateStr].hasPeriod = checkbox.checked;
+
+            if (checkbox.checked) {
+                if (!periodData.currentCycle || new Date(dateStr) < new Date(periodData.currentCycle.startDate)) {
+                    if (periodData.currentCycle) {
+                        const oldStart = new Date(periodData.currentCycle.startDate);
+                        const oldEnd = new Date(oldStart);
+                        oldEnd.setDate(oldEnd.getDate() + periodData.periodLength - 1);
+                        periodData.cycles.push({
+                            startDate: periodData.currentCycle.startDate,
+                            endDate: formatDate(oldEnd)
+                        });
+                    }
+                    periodData.currentCycle = { startDate: dateStr };
+                    periodData.postponements = [];
+                }
+            }
+
+            savePeriodData();
+            calculatePredictions();
+            renderCalendar();
+            updateStatus();
+        }
+
+        function checkDailyStatus() {
+            const today = new Date();
+            const todayStr = formatDate(today);
+            if (periodData.lastCheckDate === todayStr) return;
+
+            const phase = getCyclePhase(today);
+            if (phase?.phase === 'menstruation' && phase.isPredicted) {
+                showCheckModal();
+            }
+
+            periodData.lastCheckDate = todayStr;
+            savePeriodData();
+        }
+
+        function showCheckModal() {
+            if (document.getElementById('checkModal')) return;
+            
+            const modal = document.createElement('div');
+            modal.id = 'checkModal';
+            modal.className = 'modal check-modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="check-content">
+                        <div class="check-icon">🩸</div>
+                        <div class="check-title">检测到预测经期</div>
+                        <div class="check-desc">根据您的周期记录，今天可能是经期第一天。请问今天来月经了吗？</div>
+                        <div class="check-buttons">
+                            <button class="check-btn yes" onclick="handleCheck(true)">是，来了</button>
+                            <button class="check-btn no" onclick="handleCheck(false)">还没来</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function handleCheck(hasStarted) {
+            const today = formatDate(new Date());
+            
+            if (hasStarted) {
+                if (!periodData.records[today]) periodData.records[today] = {};
+                periodData.records[today].hasPeriod = true;
+                
+                if (periodData.currentCycle) {
+                    const oldStart = new Date(periodData.currentCycle.startDate);
+                    const oldEnd = new Date(oldStart);
+                    oldEnd.setDate(oldEnd.getDate() + periodData.periodLength - 1);
+                    periodData.cycles.push({
+                        startDate: periodData.currentCycle.startDate,
+                        endDate: formatDate(oldEnd)
+                    });
+                }
+                periodData.currentCycle = { startDate: today };
+                periodData.postponements = [];
+            } else {
+                periodData.postponements.push({ date: today, days: 1 });
+            }
+
+            savePeriodData();
+            calculatePredictions();
+            renderCalendar();
+            updateStatus();
+            document.getElementById('checkModal')?.remove();
+        }
+
+        // 症状和心情
+        function openSymptomsModal() {
+            document.getElementById('symptomsModal').style.display = 'flex';
+            const dateStr = document.getElementById('selectedDate').textContent;
+            const symptoms = periodData.records[dateStr]?.symptoms || [];
+            document.querySelectorAll('.symptom-option').forEach(opt => {
+                opt.classList.toggle('selected', symptoms.includes(opt.dataset.value));
+            });
+        }
+
+        function closeSymptomsModal() {
+            document.getElementById('symptomsModal').style.display = 'none';
+        }
+
+        function saveSymptoms() {
+            const dateStr = document.getElementById('selectedDate').textContent;
+            const selected = [];
+            document.querySelectorAll('.symptom-option.selected').forEach(opt => {
+                selected.push(opt.dataset.value);
+            });
+            if (!periodData.records[dateStr]) periodData.records[dateStr] = {};
+            periodData.records[dateStr].symptoms = selected;
+            savePeriodData();
+            updateSymptomsDisplay(selected);
+            closeSymptomsModal();
+            renderCalendar();
+        }
+
+        function updateSymptomsDisplay(symptoms) {
+            const container = document.getElementById('symptomsDisplay');
+            container.innerHTML = symptoms.length ? symptoms.map(s => `<span class="tag">${s}</span>`).join('') : '<span class="no-data">点击选择症状</span>';
+        }
+
+        function openMoodModal() {
+            document.getElementById('moodModal').style.display = 'flex';
+            const dateStr = document.getElementById('selectedDate').textContent;
+            const mood = periodData.records[dateStr]?.mood;
+            document.querySelectorAll('.mood-option').forEach(opt => {
+                opt.classList.toggle('selected', opt.dataset.value === mood);
+            });
+        }
+
+        function closeMoodModal() {
+            document.getElementById('moodModal').style.display = 'none';
+        }
+
+        function saveMood() {
+            const dateStr = document.getElementById('selectedDate').textContent;
+            const selected = document.querySelector('.mood-option.selected');
+            if (selected) {
+                if (!periodData.records[dateStr]) periodData.records[dateStr] = {};
+                periodData.records[dateStr].mood = selected.dataset.value;
+                savePeriodData();
+                updateMoodDisplay(selected.dataset.value);
+            }
+            closeMoodModal();
+            renderCalendar();
+        }
+
+        function updateMoodDisplay(mood) {
+            const container = document.getElementById('moodDisplay');
+            const emojis = { '开心': '😊', '平静': '😌', '疲惫': '😴', '焦虑': '😰', '烦躁': '😤', '难过': '😢', '生气': '😠', '兴奋': '🤩' };
+            container.innerHTML = mood ? `<span class="tag mood-tag">${emojis[mood] || ''} ${mood}</span>` : '<span class="no-data">点击选择心情</span>';
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'flex';
+            document.getElementById('cycleLength').value = periodData.cycleLength;
+            document.getElementById('periodLength').value = periodData.periodLength;
+            document.getElementById('lastPeriodDate').value = periodData.currentCycle?.startDate || '';
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function saveSettings() {
+            periodData.cycleLength = parseInt(document.getElementById('cycleLength').value) || 28;
+            periodData.periodLength = parseInt(document.getElementById('periodLength').value) || 5;
+            const newDate = document.getElementById('lastPeriodDate').value;
+            if (newDate) {
+                periodData.currentCycle = { startDate: newDate };
+            }
+            savePeriodData();
+            calculatePredictions();
+            renderCalendar();
+            updateStatus();
+            closeSettings();
+        }
+
+        // ==================== 喝水记录 ====================
+        let waterData = { weight: 50, records: [], lastDate: null, lastRecordDate: null };
+
+        function loadWaterData() {
+            const data = Storage.get('water');
+            if (data) waterData = { ...waterData, ...data };
+            const today = new Date().toDateString();
+            // 兼容旧版 lastDate 和新版 lastRecordDate
+            const lastDate = waterData.lastRecordDate || waterData.lastDate;
+            if (lastDate !== today) waterData.records = [];
+        }
+
+        function saveWaterData() {
+            // 计算期望摄入量和滞后状态
+            const goal = Math.max(1500, Math.min(2500, waterData.weight * 35));
+            const current = waterData.records.reduce((sum, r) => sum + r.amount, 0);
+            const expected = getExpectedWaterIntake(goal);
+            const behind = isWaterBehind(current, expected);
+            
+            // 添加 lastRecordDate 字段以兼容 index.html 的 getHealthDataForAI 函数
+            // 只有在滞后时才保存 isBehind 标记
+            const dataToSave = {
+                ...waterData,
+                lastRecordDate: waterData.lastDate || waterData.lastRecordDate || null,
+                // 只有滞后时才包含 isBehind 和 expectedIntake
+                ...(behind && {
+                    isBehind: true,
+                    expectedIntake: expected,
+                    behindAmount: expected - current
+                })
+            };
+            Storage.set('water', dataToSave);
+        }
+
+        // 计算当前时间段应该喝多少水（基于黄金比例分时）
+        function getExpectedWaterIntake(goal) {
+            const now = new Date();
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const currentTime = hour + minute / 60;
+            
+            // 8个时间段：8:00-10:00, 10:00-12:00, 12:00-14:00, 14:00-16:00, 16:00-18:00, 18:00-20:00, 20:00-22:00, 22:00
+            const timeSlots = [
+                { start: 8, end: 10, ratio: 0.15 },   // 15%
+                { start: 10, end: 12, ratio: 0.15 },  // 15%
+                { start: 12, end: 14, ratio: 0.15 },  // 15%
+                { start: 14, end: 16, ratio: 0.15 },  // 15%
+                { start: 16, end: 18, ratio: 0.15 },  // 15%
+                { start: 18, end: 20, ratio: 0.15 },  // 15%
+                { start: 20, end: 22, ratio: 0.08 },  // 8%
+                { start: 22, end: 24, ratio: 0.02 }   // 2%
+            ];
+            
+            let expectedRatio = 0;
+            for (const slot of timeSlots) {
+                if (currentTime >= slot.end) {
+                    // 当前时间已经过了这个时段，累加全部比例
+                    expectedRatio += slot.ratio;
+                } else if (currentTime >= slot.start && currentTime < slot.end) {
+                    // 当前时间在这个时段内，按比例计算
+                    const slotProgress = (currentTime - slot.start) / (slot.end - slot.start);
+                    expectedRatio += slot.ratio * slotProgress;
+                    break;
+                }
+            }
+            
+            return Math.round(goal * expectedRatio);
+        }
+        
+        // 检查是否滞后（当前摄入 < 期望摄入 - 阈值）
+        function isWaterBehind(current, expected) {
+            const threshold = 200; // 滞后阈值：200ml
+            return current < expected - threshold;
+        }
+        
+        function updateWaterDisplay() {
+            document.getElementById('waterWeight').textContent = waterData.weight;
+            const goal = Math.max(1500, Math.min(2500, waterData.weight * 35));
+            document.getElementById('waterGoal').textContent = goal;
+            
+            const current = waterData.records.reduce((sum, r) => sum + r.amount, 0);
+            document.getElementById('currentIntake').textContent = current;
+            
+            // 计算期望摄入量和滞后状态
+            const expected = getExpectedWaterIntake(goal);
+            document.getElementById('expectedIntake').textContent = expected;
+            const behind = isWaterBehind(current, expected);
+            
+            // 保存滞后状态，供 API 调用时判断
+            waterData.isBehind = behind;
+            waterData.expectedIntake = expected;
+            
+            const percentage = Math.min(100, (current / goal) * 100);
+            document.getElementById('waterWave').style.height = percentage + '%';
+            document.getElementById('waterPercentage').textContent = Math.round(percentage) + '%';
+            
+            // 显示滞后提示
+            const waveContainer = document.querySelector('.water-wave-container');
+            if (behind) {
+                waveContainer.style.boxShadow = 'inset 0 0 20px rgba(255, 160, 140, 0.3), 0 0 20px rgba(255, 112, 67, 0.2)';
+            } else {
+                waveContainer.style.boxShadow = 'inset 0 0 20px rgba(255, 160, 140, 0.1)';
+            }
+            
+            renderWaterRecords();
+        }
+
+        function renderWaterRecords() {
+            const container = document.getElementById('waterRecords');
+            if (waterData.records.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #bcaaa4; padding: 30px 0;">今天还没有喝水记录哦~</div>';
+                return;
+            }
+            
+            const sorted = [...waterData.records].sort((a, b) => b.time.localeCompare(a.time));
+            container.innerHTML = sorted.map(r => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #faf7f5; border-radius: 14px; margin-bottom: 10px;">
+                    <span style="font-size: 13px; color: #8d6e63;">${r.time}</span>
+                    <span style="font-size: 14px; font-weight: 600; color: #5d9ea0;">+${r.amount}ml</span>
+                </div>
+            `).join('');
+        }
+
+        function addWater(amount) {
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            waterData.records.push({ time: timeStr, amount });
+            waterData.lastDate = now.toDateString();
+            saveWaterData();
+            updateWaterDisplay();
+        }
+
+        function openWeightSettings() {
+            document.getElementById('weightModal').style.display = 'flex';
+            document.getElementById('weightInput').value = waterData.weight;
+        }
+
+        function closeWeightModal() {
+            document.getElementById('weightModal').style.display = 'none';
+        }
+
+        function saveWeight() {
+            const newWeight = parseFloat(document.getElementById('weightInput').value);
+            if (newWeight >= 30 && newWeight <= 150) {
+                waterData.weight = newWeight;
+                saveWaterData();
+                updateWaterDisplay();
+                closeWeightModal();
+            }
+        }
+
+        // ==================== 疾病管理 ====================
+        let diseaseData = { diseases: [], symptomRecords: [], medicationChecks: {} };
+
+        function loadDiseaseData() {
+            const data = Storage.get('disease');
+            if (data) diseaseData = { ...diseaseData, ...data };
+        }
+
+        function saveDiseaseData() {
+            Storage.set('disease', diseaseData);
+        }
+
+        function renderDiseaseList() {
+            const container = document.getElementById('diseaseList');
+            if (diseaseData.diseases.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #bcaaa4; padding: 30px 0;">暂无疾病记录，点击右上角添加</div>';
+                return;
+            }
+            
+            container.innerHTML = diseaseData.diseases.map(d => `
+                <div class="disease-item">
+                    <div class="disease-name">${d.name}</div>
+                    <span class="disease-type">${d.type === 'long' ? '长期' : '短期'}</span>
+                    ${d.medications?.map(m => `<span class="medication-tag">💊 ${m.name} ${m.dose}</span>`).join('') || ''}
+                </div>
+            `).join('');
+        }
+
+        function renderMedicationList() {
+            const container = document.getElementById('medicationList');
+            const allMeds = [];
+            diseaseData.diseases.forEach(d => {
+                d.medications?.forEach(m => {
+                    m.times?.forEach(t => allMeds.push({ ...m, diseaseName: d.name, time: t }));
+                });
+            });
+
+            if (allMeds.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #bcaaa4; padding: 30px 0;">暂无用药计划</div>';
+                document.getElementById('medicationProgress').textContent = '0/0';
+                return;
+            }
+
+            const today = new Date().toDateString();
+            const checks = diseaseData.medicationChecks[today] || {};
+            let checkedCount = 0;
+
+            container.innerHTML = allMeds.map((m, i) => {
+                const checkId = `${m.id}_${m.time}`;
+                const isChecked = checks[checkId];
+                if (isChecked) checkedCount++;
+                const timeLabels = { morning: '早上', noon: '中午', evening: '晚上', beforeBed: '睡前' };
+                
+                return `
+                    <div class="check-item ${isChecked ? 'checked' : ''}" onclick="toggleMedication('${m.id}', '${m.time}')">
+                        <div class="check-box">${isChecked ? '✓' : ''}</div>
+                        <div class="check-info">
+                            <div class="check-name">${m.name} ${m.dose}</div>
+                            <div class="check-time">${timeLabels[m.time] || m.time} · ${m.diseaseName}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('medicationProgress').textContent = `${checkedCount}/${allMeds.length}`;
+        }
+
+        function toggleMedication(medId, time) {
+            const today = new Date().toDateString();
+            if (!diseaseData.medicationChecks[today]) diseaseData.medicationChecks[today] = {};
+            const checkId = `${medId}_${time}`;
+            diseaseData.medicationChecks[today][checkId] = !diseaseData.medicationChecks[today][checkId];
+            saveDiseaseData();
+            renderMedicationList();
+        }
+
+        function renderSymptomList() {
+            const container = document.getElementById('symptomList');
+            const today = new Date().toDateString();
+            const todayRecords = diseaseData.symptomRecords.filter(r => new Date(r.timestamp).toDateString() === today);
+
+            if (todayRecords.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #bcaaa4; padding: 30px 0;">今日暂无症状记录</div>';
+                return;
+            }
+
+            const severityLabels = { mild: '轻微', moderate: '中等', severe: '严重' };
+            container.innerHTML = todayRecords.map(r => `
+                <div style="background: #faf7f5; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 14px; color: #5d4037; font-weight: 500;">${r.desc}</span>
+                        <span style="font-size: 11px; padding: 4px 10px; border-radius: 10px; background: ${r.severity === 'mild' ? '#d4e4d4' : r.severity === 'moderate' ? '#f5e6d3' : '#e8d5d0'}; color: ${r.severity === 'mild' ? '#5d7a5d' : '#8d6e63'};">${severityLabels[r.severity]}</span>
+                    </div>
+                    <div style="font-size: 11px; color: #bcaaa4;">${r.time}</div>
+                </div>
+            `).join('');
+        }
+
+        function openDiseaseModal() {
+            const name = prompt('疾病名称：');
+            if (!name) return;
+            const type = confirm('是长期疾病（慢性病）吗？\n确定=长期，取消=短期') ? 'long' : 'short';
+            const disease = { id: Date.now().toString(), name, type, medications: [] };
+            
+            const medName = prompt('用药名称（可选）：');
+            if (medName) {
+                const dose = prompt('剂量：') || '1次';
+                const times = [];
+                if (confirm('早上服用？')) times.push('morning');
+                if (confirm('中午服用？')) times.push('noon');
+                if (confirm('晚上服用？')) times.push('evening');
+                if (confirm('睡前服用？')) times.push('beforeBed');
+                if (times.length === 0) times.push('morning');
+                disease.medications.push({ id: Date.now().toString(), name: medName, dose, times });
+            }
+            
+            diseaseData.diseases.push(disease);
+            saveDiseaseData();
+            renderDiseaseList();
+            renderMedicationList();
+        }
+
+        function openSymptomModal() {
+            const desc = prompt('症状描述：');
+            if (!desc) return;
+            const severity = confirm('严重程度？\n确定=严重，取消=轻微/中等') ? 'severe' : confirm('中等程度？\n确定=中等，取消=轻微') ? 'moderate' : 'mild';
+            
+            const now = new Date();
+            diseaseData.symptomRecords.push({
+                id: Date.now().toString(),
+                desc,
+                severity,
+                timestamp: now.getTime(),
+                time: now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0')
+            });
+            saveDiseaseData();
+            renderSymptomList();
+        }
+
+        // ==================== 通用功能 ====================
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        // 解析日期字符串为本地日期（避免时区问题）
+        function parseDate(dateStr) {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(year, month - 1, day);
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            document.querySelectorAll('.bottom-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            if (tabName === 'period') {
+                renderCalendar();
+                updateStatus();
+            } else if (tabName === 'water') {
+                updateWaterDisplay();
+            } else if (tabName === 'disease') {
+                renderDiseaseList();
+                renderMedicationList();
+                renderSymptomList();
+            }
+        }
+
+        function goBack() {
+            window.close();
+            // 如果无法关闭，返回上一页
+            if (!window.closed) {
+                history.back();
+            }
+        }
+
+        // 点击选项
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('symptom-option')) {
+                e.target.classList.toggle('selected');
+            }
+            if (e.target.classList.contains('mood-option')) {
+                document.querySelectorAll('.mood-option').forEach(el => el.classList.remove('selected'));
+                e.target.classList.add('selected');
+            }
+        });
+
+        // 初始化
+        window.onload = function() {
+            loadPeriodData();
+            loadWaterData();
+            loadDiseaseData();
+            calculatePredictions();
+            renderCalendar();
+            updateStatus();
+            setTimeout(checkDailyStatus, 1000);
+        };
+    </script>
+</body>
+</html>

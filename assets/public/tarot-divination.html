@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>气运之门 - 塔罗占卜</title>
+    
+    <!-- 神秘字体 -->
+    <link href="https://fontsapi.zeoseven.com/492/main/result.css" rel="stylesheet">
+    
+    <!-- localforage 本地存储库 -->
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+            color: #fff;
+        }
+        
+        /* 星空背景 */
+        .stars-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite ease-in-out;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        
+        /* 神秘光晕 */
+        .mystic-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(138, 43, 226, 0.15) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1;
+            animation: pulse 4s infinite ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
+        }
+        
+        /* 状态栏占位 */
+        .status-bar-placeholder {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.3));
+            z-index: 101;
+            pointer-events: none;
+        }
+
+        /* 顶部导航 */
+        .header {
+            position: fixed;
+            top: 30px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+        }
+        
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .back-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+        
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+        
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #e0d5ff;
+            text-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+            letter-spacing: 2px;
+        }
+        
+        .header-right {
+            width: 40px;
+        }
+        
+        /* 主容器 */
+        .main-container {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-top: 110px;
+            padding-bottom: 20px;
+        }
+        
+        /* 问题输入区域 */
+        .question-section {
+            padding: 0 20px;
+            margin-bottom: 20px;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+        
+        .question-section.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .question-label {
+            font-size: 14px;
+            color: #a090d0;
+            margin-bottom: 10px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        
+        .question-input-wrapper {
+            position: relative;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            padding: 15px 20px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .question-input-wrapper:focus-within {
+            border-color: rgba(138, 43, 226, 0.8);
+            box-shadow: 0 0 30px rgba(138, 43, 226, 0.2);
+        }
+        
+        .question-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            font-family: inherit;
+        }
+        
+        .question-input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+        
+        /* 开始占卜按钮 */
+        .start-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 15px 50px;
+            background: linear-gradient(135deg, #8a2be2 0%, #4a0080 100%);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(138, 43, 226, 0.4);
+            letter-spacing: 2px;
+        }
+        
+        .start-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(138, 43, 226, 0.5);
+        }
+        
+        /* 卡牌区域 */
+        .cards-area {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            perspective: 1500px;
+            overflow: hidden;
+        }
+        
+        /* 牌组容器 */
+        .deck-container {
+            position: relative;
+            width: 100px;
+            height: 160px;
+            cursor: pointer;
+            transition: all 0.5s ease;
+            z-index: 50;
+        }
+        
+        .deck-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.8);
+        }
+        
+        /* 牌背 */
+        .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #2d1b4e 0%, #1a0f2e 100%);
+            border: 2px solid #8a2be2;
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.5),
+                inset 0 0 30px rgba(138, 43, 226, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backface-visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .card-back::before {
+            content: '';
+            position: absolute;
+            width: 80%;
+            height: 80%;
+            border: 1px solid rgba(138, 43, 226, 0.5);
+            border-radius: 6px;
+        }
+        
+        .card-back-pattern {
+            width: 60%;
+            height: 60%;
+            background: 
+                radial-gradient(circle at 30% 30%, rgba(138, 43, 226, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(75, 0, 130, 0.3) 0%, transparent 50%);
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .card-back-pattern::after {
+            content: '✦';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: rgba(138, 43, 226, 0.6);
+        }
+        
+        /* 堆叠的牌 */
+        .deck-card {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .deck-card:nth-child(1) { transform: translate(0, 0); }
+        .deck-card:nth-child(2) { transform: translate(1px, 1px); }
+        .deck-card:nth-child(3) { transform: translate(2px, 2px); }
+        .deck-card:nth-child(4) { transform: translate(3px, 3px); }
+        .deck-card:nth-child(5) { transform: translate(4px, 4px); }
+        
+        /* 点击提示 */
+        .deck-hint {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+            white-space: nowrap;
+            animation: hintPulse 2s infinite ease-in-out;
+            text-align: center;
+        }
+        
+        @keyframes hintPulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+        
+        /* 洗牌动画区域 */
+        .shuffle-area {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 40;
+        }
+        
+        .shuffle-card {
+            position: absolute;
+            width: 60px;
+            height: 100px;
+            left: 50%;
+            top: 50%;
+            margin-left: -30px;
+            margin-top: -50px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2d1b4e 0%, #1a0f2e 100%);
+            border: 2px solid #8a2be2;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: rgba(138, 43, 226, 0.6);
+            transition: none;
+        }
+        
+        .shuffle-card::after {
+            content: '✦';
+        }
+        
+        /* 扇形牌阵区域 */
+        .fan-area {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            overflow: hidden;
+        }
+        
+        .fan-area.show {
+            display: block;
+            opacity: 1;
+        }
+        
+        /* 上半部分扇形 */
+        .fan-upper {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 35%;
+        }
+        
+        /* 下半部分扇形 */
+        .fan-lower {
+            position: absolute;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 35%;
+        }
+        
+        /* 扇形中的牌 */
+        .fan-card {
+            position: absolute;
+            width: 70px;
+            height: 120px;
+            border-radius: 8px;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            left: 50%;
+            top: 50%;
+            margin-left: -35px;
+            margin-top: -60px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+        }
+        
+        .fan-card:hover {
+            transform: scale(1.15) translateY(-15px) !important;
+            z-index: 100 !important;
+            box-shadow: 0 15px 40px rgba(138, 43, 226, 0.5);
+        }
+        
+        .fan-card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .fan-card.reversed .card-inner {
+            transform: rotateY(180deg) rotateZ(180deg);
+        }
+        
+        .fan-card.reversed.selected {
+            box-shadow: 0 0 30px rgba(255, 50, 50, 0.8);
+            animation: reversedPulse 1.5s infinite ease-in-out;
+        }
+        
+        @keyframes reversedPulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255, 50, 50, 0.8); }
+            50% { box-shadow: 0 0 50px rgba(255, 50, 50, 1); }
+        }
+        
+        .fan-card.selected {
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.9);
+            animation: selectedPulse 1.5s infinite ease-in-out;
+        }
+        
+        @keyframes selectedPulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255, 215, 0, 0.9); }
+            50% { box-shadow: 0 0 50px rgba(255, 215, 0, 1); }
+        }
+        
+        .fan-card.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            filter: grayscale(0.9);
+        }
+        
+        /* 卡牌内部 */
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-front, .card-back-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            backface-visibility: hidden;
+            overflow: hidden;
+        }
+        
+        .card-back-face {
+            background: linear-gradient(135deg, #1a0a2e 0%, #0d0518 100%);
+            border: 2px solid #4a0080;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card-back-face::before {
+            content: '';
+            position: absolute;
+            width: 85%;
+            height: 85%;
+            border: 1px solid rgba(138, 43, 226, 0.4);
+            border-radius: 6px;
+        }
+        
+        .card-back-face::after {
+            content: '✦';
+            font-size: 28px;
+            color: rgba(138, 43, 226, 0.5);
+        }
+        
+        .card-front {
+            background: #fff;
+            transform: rotateY(180deg);
+            border: 1px solid #d4af37;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 4px;
+        }
+        
+        .card-front-img {
+            width: 100%;
+            height: 85%;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        
+        .card-front-name {
+            font-size: 9px;
+            color: #4a0080;
+            text-align: center;
+            margin-top: 2px;
+            font-weight: 600;
+            line-height: 1.1;
+        }
+        
+        /* 状态提示 */
+        .status-text {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 60;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            white-space: nowrap;
+        }
+        
+        .status-text.show {
+            opacity: 1;
+        }
+        
+        /* 选牌计数器 */
+        .selection-counter {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(138, 43, 226, 0.3);
+            border: 1px solid rgba(138, 43, 226, 0.5);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #e0d5ff;
+            z-index: 55;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .selection-counter.show {
+            opacity: 1;
+        }
+        
+        /* 结果展示区域 */
+        .result-section {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 200;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            overflow-y: auto;
+            padding: 80px 20px 40px;
+        }
+        
+        .result-section.show {
+            display: block;
+            opacity: 1;
+        }
+        
+        .result-content {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .result-title {
+            font-size: 24px;
+            color: #e0d5ff;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+        }
+        
+        .result-cards {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .result-card {
+            width: 100px;
+            height: 175px;
+            background: #fff;
+            border-radius: 10px;
+            border: 2px solid #d4af37;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 5px;
+            overflow: hidden;
+        }
+        
+        .result-card-img {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+        
+        .result-card-name {
+            font-size: 11px;
+            color: #4a0080;
+            text-align: center;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        
+        .result-card-position {
+            font-size: 10px;
+            color: #8a2be2;
+            margin-top: 2px;
+        }
+        
+        .result-card.reversed {
+            border-color: #ff4444;
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.3);
+        }
+        
+        .result-card.reversed .result-card-name {
+            color: #ff4444;
+        }
+        
+        .result-card.reversed .result-card-position {
+            color: #ff6666;
+        }
+        
+        .result-interpretation {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+        }
+        
+        .result-question {
+            font-size: 14px;
+            color: #a090d0;
+            margin-bottom: 15px;
+            text-align: center;
+            font-style: italic;
+        }
+        
+        .result-text {
+            font-size: 14px;
+            line-height: 1.8;
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .result-text p {
+            margin-bottom: 15px;
+        }
+        
+        .close-result-btn {
+            display: block;
+            margin: 30px auto 0;
+            padding: 12px 40px;
+            background: rgba(138, 43, 226, 0.3);
+            border: 1px solid rgba(138, 43, 226, 0.5);
+            border-radius: 25px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .close-result-btn:hover {
+            background: rgba(138, 43, 226, 0.5);
+        }
+        
+        /* AI大师解读按钮 */
+        .ai-master-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+            border: none;
+            border-radius: 30px;
+            color: #1a1a2e;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+            letter-spacing: 2px;
+        }
+        
+        .ai-master-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.5);
+        }
+        
+        .ai-master-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .ai-master-btn.loading {
+            background: linear-gradient(135deg, #666 0%, #333 100%);
+            color: #fff;
+        }
+        
+        /* AI解读内容区域 */
+        .ai-interpretation {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid rgba(138, 43, 226, 0.3);
+        }
+        
+        .ai-interpretation-title {
+            font-size: 18px;
+            color: #ffd700;
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+        
+        .ai-interpretation-content {
+            font-size: 14px;
+            line-height: 1.8;
+            color: rgba(255,255,255,0.95);
+            background: rgba(255,215,0,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+        
+        .ai-interpretation-content p {
+            margin-bottom: 12px;
+        }
+        
+        /* 魔法粒子效果 */
+        .magic-particle {
+            position: fixed;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, #fff 0%, #8a2be2 100%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            animation: particleFloat 1.5s ease-out forwards;
+            box-shadow: 0 0 10px #8a2be2;
+        }
+        
+        @keyframes particleFloat {
+            0% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); }
+        }
+        
+        /* 图片加载占位符 */
+        .card-front-img {
+            background: linear-gradient(135deg, #2d1b4e 0%, #1a0f2e 100%);
+        }
+        
+        /* 加载指示器 */
+        .loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 150;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .loading-indicator.show {
+            display: flex;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(138, 43, 226, 0.3);
+            border-top-color: #8a2be2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 14px;
+            color: #e0d5ff;
+            text-align: center;
+        }
+        
+        /* 牌阵选择弹窗 */
+        .spread-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 500;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            overflow-y: auto;
+            padding: 110px 20px 40px;
+        }
+
+        .spread-modal.show {
+            display: block;
+            opacity: 1;
+        }
+
+        .spread-modal-content {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .spread-modal-title {
+            font-size: 22px;
+            color: #e0d5ff;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+        }
+
+        .spread-modal-subtitle {
+            font-size: 13px;
+            color: #a090d0;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .spread-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .spread-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            border-radius: 16px;
+            padding: 16px 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .spread-item:hover {
+            background: rgba(138, 43, 226, 0.15);
+            border-color: rgba(138, 43, 226, 0.6);
+            transform: translateX(5px);
+        }
+
+        .spread-item-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #8a2be2 0%, #4a0080 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .spread-item-info {
+            flex: 1;
+        }
+
+        .spread-item-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e0d5ff;
+            margin-bottom: 4px;
+        }
+
+        .spread-item-desc {
+            font-size: 12px;
+            color: #a090d0;
+            line-height: 1.4;
+        }
+
+        .spread-item-count {
+            font-size: 12px;
+            color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 375px) {
+            .fan-card {
+                width: 60px;
+                height: 100px;
+                margin-left: -30px;
+                margin-top: -50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 状态栏占位 -->
+    <div class="status-bar-placeholder"></div>
+
+    <!-- 星空背景 -->
+    <div class="stars-bg" id="starsBg"></div>
+
+    <!-- 神秘光晕 -->
+    <div class="mystic-glow"></div>
+
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="back-btn" onclick="goBack()">
+            <svg viewBox="0 0 24 24">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </svg>
+        </div>
+        <div class="page-title">✦ 气运之门 ✦</div>
+        <div class="header-right"></div>
+    </div>
+    
+    <!-- 选牌计数器 -->
+    <div class="selection-counter" id="selectionCounter">已选择 0/3 张牌</div>
+    
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 问题输入区域 -->
+        <div class="question-section" id="questionSection">
+            <div class="question-label">在心中默念你的问题</div>
+            <div class="question-input-wrapper">
+                <input type="text" class="question-input" id="questionInput" placeholder="例如：我最近的运势如何？" maxlength="50">
+            </div>
+            <button class="start-btn" id="startBtn" onclick="startDivination()">开启占卜</button>
+        </div>
+        
+        <!-- 卡牌区域 -->
+        <div class="cards-area" id="cardsArea">
+            <!-- 牌组 -->
+            <div class="deck-container" id="deckContainer" onclick="shuffleDeck()">
+                <div class="deck-card"><div class="card-back"><div class="card-back-pattern"></div></div></div>
+                <div class="deck-card"><div class="card-back"><div class="card-back-pattern"></div></div></div>
+                <div class="deck-card"><div class="card-back"><div class="card-back-pattern"></div></div></div>
+                <div class="deck-card"><div class="card-back"><div class="card-back-pattern"></div></div></div>
+                <div class="deck-card"><div class="card-back"><div class="card-back-pattern"></div></div></div>
+                <div class="deck-hint">点击洗牌<br>展开全部78张牌</div>
+            </div>
+            
+            <!-- 洗牌动画区域 -->
+            <div class="shuffle-area" id="shuffleArea"></div>
+            
+            <!-- 扇形牌阵区域 -->
+            <div class="fan-area" id="fanArea">
+                <div class="fan-upper" id="fanUpper"></div>
+                <div class="fan-lower" id="fanLower"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 状态提示 -->
+    <div class="status-text" id="statusText"></div>
+    
+    <!-- 加载指示器 -->
+    <div class="loading-indicator" id="loadingIndicator">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载塔罗牌...</div>
+    </div>
+    
+    <!-- 牌阵选择弹窗 -->
+    <div class="spread-modal" id="spreadModal">
+        <div class="spread-modal-content">
+            <div class="spread-modal-title">✦ 选择牌阵 ✦</div>
+            <div class="spread-modal-subtitle">选择适合你的占卜方式</div>
+            <div class="spread-list" id="spreadList"></div>
+        </div>
+    </div>
+
+    <!-- 结果展示 -->
+    <div class="result-section" id="resultSection">
+        <div class="result-content">
+            <div class="result-title">✦ 占卜结果 ✦</div>
+            <div class="result-cards" id="resultCards"></div>
+            <div class="result-interpretation">
+                <div class="result-question" id="resultQuestion"></div>
+                <div class="result-text" id="resultText"></div>
+                
+                <!-- AI大师解读区域 -->
+                <div class="ai-interpretation" id="aiInterpretation" style="display: none;">
+                    <div class="ai-interpretation-title">✦ 大师深度解读 ✦</div>
+                    <div class="ai-interpretation-content" id="aiInterpretationContent"></div>
+                </div>
+            </div>
+            
+            <button class="ai-master-btn" id="aiMasterBtn" onclick="getAIMasterInterpretation()">请大师解读</button>
+            <button class="close-result-btn" onclick="closeResult()">再次占卜</button>
+        </div>
+    </div>
+
+    <!-- 图片预加载和缓存优化 -->
+    <script>
+        // 图片缓存管理
+        const imageCache = new Map();
+        const preloadedImages = new Set();
+        
+        // 预加载单张图片
+        function preloadImage(url) {
+            if (preloadedImages.has(url)) return Promise.resolve();
+            
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    imageCache.set(url, img);
+                    preloadedImages.add(url);
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+        
+        // 批量预加载图片（带并发限制）
+        async function preloadImages(urls, batchSize = 5) {
+            for (let i = 0; i < urls.length; i += batchSize) {
+                const batch = urls.slice(i, i + batchSize);
+                await Promise.all(batch.map(url => preloadImage(url).catch(() => {})));
+            }
+        }
+        
+        // 获取图片URL（使用更快速的CDN或本地缓存）
+        function getOptimizedImageUrl(originalUrl) {
+            // 如果已经缓存，直接返回
+            if (imageCache.has(originalUrl)) {
+                return originalUrl;
+            }
+            return originalUrl;
+        }
+    </script>
+
+    <script>
+        // 全套78张塔罗牌数据 (22张大阿尔卡那 + 56张小阿尔卡那)
+        const tarotCards = [
+            // 大阿尔卡那 (0-21)
+            { name: '愚者', num: 0, img: 'https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg', meaning: '新的开始，冒险，纯真', type: 'major' },
+            { name: '魔术师', num: 1, img: 'https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg', meaning: '创造力，意志力，显化', type: 'major' },
+            { name: '女祭司', num: 2, img: 'https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg', meaning: '直觉，神秘，内在智慧', type: 'major' },
+            { name: '皇后', num: 3, img: 'https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg', meaning: '丰饶，母性，创造力', type: 'major' },
+            { name: '皇帝', num: 4, img: 'https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg', meaning: '权威，稳定，结构', type: 'major' },
+            { name: '教皇', num: 5, img: 'https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg', meaning: '传统，指导，信仰', type: 'major' },
+            { name: '恋人', num: 6, img: 'https://upload.wikimedia.org/wikipedia/commons/3/3a/TheLovers.jpg', meaning: '爱情，选择，和谐', type: 'major' },
+            { name: '战车', num: 7, img: 'https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg', meaning: '意志力，胜利，决心', type: 'major' },
+            { name: '力量', num: 8, img: 'https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg', meaning: '勇气，耐心，内在力量', type: 'major' },
+            { name: '隐者', num: 9, img: 'https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg', meaning: '内省，独处，寻求真理', type: 'major' },
+            { name: '命运之轮', num: 10, img: 'https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg', meaning: '变化，周期，命运', type: 'major' },
+            { name: '正义', num: 11, img: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg', meaning: '平衡，公正，真理', type: 'major' },
+            { name: '倒吊人', num: 12, img: 'https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg', meaning: '牺牲，新视角，等待', type: 'major' },
+            { name: '死神', num: 13, img: 'https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg', meaning: '转变，结束，新生', type: 'major' },
+            { name: '节制', num: 14, img: 'https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg', meaning: '平衡，调和，耐心', type: 'major' },
+            { name: '恶魔', num: 15, img: 'https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg', meaning: '束缚，欲望，物质主义', type: 'major' },
+            { name: '塔', num: 16, img: 'https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg', meaning: '突变，觉醒，破坏', type: 'major' },
+            { name: '星星', num: 17, img: 'https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_17_Star.jpg', meaning: '希望，灵感，宁静', type: 'major' },
+            { name: '月亮', num: 18, img: 'https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg', meaning: '幻觉，恐惧，潜意识', type: 'major' },
+            { name: '太阳', num: 19, img: 'https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg', meaning: '成功，喜悦，活力', type: 'major' },
+            { name: '审判', num: 20, img: 'https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgement.jpg', meaning: '重生，觉醒，救赎', type: 'major' },
+            { name: '世界', num: 21, img: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg', meaning: '完成，成就，整合', type: 'major' },
+            
+            // 权杖牌组 (Wands) - 14张
+            { name: '权杖首牌', num: 1, img: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/Wands01.jpg', meaning: '创造力，灵感，新机会', type: 'wands' },
+            { name: '权杖二', num: 2, img: 'https://upload.wikimedia.org/wikipedia/commons/0/0f/Wands02.jpg', meaning: '规划，决策，未来展望', type: 'wands' },
+            { name: '权杖三', num: 3, img: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Wands03.jpg', meaning: '扩展，远见，合作', type: 'wands' },
+            { name: '权杖四', num: 4, img: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Wands04.jpg', meaning: '庆祝，稳定，和谐', type: 'wands' },
+            { name: '权杖五', num: 5, img: 'https://upload.wikimedia.org/wikipedia/commons/9/9d/Wands05.jpg', meaning: '冲突，竞争，挑战', type: 'wands' },
+            { name: '权杖六', num: 6, img: 'https://upload.wikimedia.org/wikipedia/commons/3/3b/Wands06.jpg', meaning: '胜利，认可，成功', type: 'wands' },
+            { name: '权杖七', num: 7, img: 'https://upload.wikimedia.org/wikipedia/commons/e/e4/Wands07.jpg', meaning: '防御，坚持，勇气', type: 'wands' },
+            { name: '权杖八', num: 8, img: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/Wands08.jpg', meaning: '速度，行动，进展', type: 'wands' },
+            { name: '权杖九', num: 9, img: 'https://upload.wikimedia.org/wikipedia/commons/e/e7/Wands09.jpg', meaning: '韧性，准备，警觉', type: 'wands' },
+            { name: '权杖十', num: 10, img: 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Wands10.jpg', meaning: '负担，责任，压力', type: 'wands' },
+            { name: '权杖侍从', num: 11, img: 'https://upload.wikimedia.org/wikipedia/commons/6/6a/Wands11.jpg', meaning: '探索，热情，新消息', type: 'wands' },
+            { name: '权杖骑士', num: 12, img: 'https://upload.wikimedia.org/wikipedia/commons/1/16/Wands12.jpg', meaning: '冒险，冲动，行动力', type: 'wands' },
+            { name: '权杖皇后', num: 13, img: 'https://upload.wikimedia.org/wikipedia/commons/0/0d/Wands13.jpg', meaning: '自信，热情，魅力', type: 'wands' },
+            { name: '权杖国王', num: 14, img: 'https://upload.wikimedia.org/wikipedia/commons/c/ce/Wands14.jpg', meaning: '领导力，远见，创业', type: 'wands' },
+            
+            // 圣杯牌组 (Cups) - 14张
+            { name: '圣杯首牌', num: 1, img: 'https://upload.wikimedia.org/wikipedia/commons/3/36/Cups01.jpg', meaning: '爱，情感，直觉', type: 'cups' },
+            { name: '圣杯二', num: 2, img: 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Cups02.jpg', meaning: '伙伴关系，和谐，吸引', type: 'cups' },
+            { name: '圣杯三', num: 3, img: 'https://upload.wikimedia.org/wikipedia/commons/7/7a/Cups03.jpg', meaning: '庆祝，友谊，社交', type: 'cups' },
+            { name: '圣杯四', num: 4, img: 'https://upload.wikimedia.org/wikipedia/commons/3/35/Cups04.jpg', meaning: '沉思，不满，重新评估', type: 'cups' },
+            { name: '圣杯五', num: 5, img: 'https://upload.wikimedia.org/wikipedia/commons/d/d7/Cups05.jpg', meaning: '失落，悲伤，失望', type: 'cups' },
+            { name: '圣杯六', num: 6, img: 'https://upload.wikimedia.org/wikipedia/commons/1/17/Cups06.jpg', meaning: '怀旧，童年，回忆', type: 'cups' },
+            { name: '圣杯七', num: 7, img: 'https://upload.wikimedia.org/wikipedia/commons/a/ae/Cups07.jpg', meaning: '选择，幻想，欲望', type: 'cups' },
+            { name: '圣杯八', num: 8, img: 'https://upload.wikimedia.org/wikipedia/commons/6/60/Cups08.jpg', meaning: '离开，放弃，寻求更多', type: 'cups' },
+            { name: '圣杯九', num: 9, img: 'https://upload.wikimedia.org/wikipedia/commons/2/24/Cups09.jpg', meaning: '满足，愿望实现，幸福', type: 'cups' },
+            { name: '圣杯十', num: 10, img: 'https://upload.wikimedia.org/wikipedia/commons/8/84/Cups10.jpg', meaning: '家庭和谐，幸福，圆满', type: 'cups' },
+            { name: '圣杯侍从', num: 11, img: 'https://upload.wikimedia.org/wikipedia/commons/a/ad/Cups11.jpg', meaning: '创意，敏感，新感情', type: 'cups' },
+            { name: '圣杯骑士', num: 12, img: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Cups12.jpg', meaning: '浪漫，魅力，追求', type: 'cups' },
+            { name: '圣杯皇后', num: 13, img: 'https://upload.wikimedia.org/wikipedia/commons/6/62/Cups13.jpg', meaning: '同情心，直觉，情感丰富', type: 'cups' },
+            { name: '圣杯国王', num: 14, img: 'https://upload.wikimedia.org/wikipedia/commons/0/04/Cups14.jpg', meaning: '情感控制，智慧，外交', type: 'cups' },
+            
+            // 宝剑牌组 (Swords) - 14张
+            { name: '宝剑首牌', num: 1, img: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Swords01.jpg', meaning: '清晰，突破，新思维', type: 'swords' },
+            { name: '宝剑二', num: 2, img: 'https://upload.wikimedia.org/wikipedia/commons/9/9e/Swords02.jpg', meaning: '僵局，回避，艰难选择', type: 'swords' },
+            { name: '宝剑三', num: 3, img: 'https://upload.wikimedia.org/wikipedia/commons/0/02/Swords03.jpg', meaning: '心碎，悲伤，痛苦', type: 'swords' },
+            { name: '宝剑四', num: 4, img: 'https://upload.wikimedia.org/wikipedia/commons/b/bf/Swords04.jpg', meaning: '休息，恢复，沉思', type: 'swords' },
+            { name: '宝剑五', num: 5, img: 'https://upload.wikimedia.org/wikipedia/commons/2/23/Swords05.jpg', meaning: '冲突，失败，不和', type: 'swords' },
+            { name: '宝剑六', num: 6, img: 'https://upload.wikimedia.org/wikipedia/commons/2/29/Swords06.jpg', meaning: '过渡，移动，疗愈', type: 'swords' },
+            { name: '宝剑七', num: 7, img: 'https://upload.wikimedia.org/wikipedia/commons/3/34/Swords07.jpg', meaning: '欺骗，策略，偷窃', type: 'swords' },
+            { name: '宝剑八', num: 8, img: 'https://upload.wikimedia.org/wikipedia/commons/a/a7/Swords08.jpg', meaning: '限制，束缚，无力感', type: 'swords' },
+            { name: '宝剑九', num: 9, img: 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Swords09.jpg', meaning: '焦虑，噩梦，担忧', type: 'swords' },
+            { name: '宝剑十', num: 10, img: 'https://upload.wikimedia.org/wikipedia/commons/d/d4/Swords10.jpg', meaning: '痛苦结束，重生，低谷', type: 'swords' },
+            { name: '宝剑侍从', num: 11, img: 'https://upload.wikimedia.org/wikipedia/commons/4/4c/Swords11.jpg', meaning: '好奇，新想法，警觉', type: 'swords' },
+            { name: '宝剑骑士', num: 12, img: 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Swords12.jpg', meaning: '行动，冲动，激进', type: 'swords' },
+            { name: '宝剑皇后', num: 13, img: 'https://upload.wikimedia.org/wikipedia/commons/d/d4/Swords13.jpg', meaning: '独立，清晰，直率', type: 'swords' },
+            { name: '宝剑国王', num: 14, img: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Swords14.jpg', meaning: '智慧，权威，真理', type: 'swords' },
+            
+            // 星币牌组 (Pentacles) - 14张
+            { name: '星币首牌', num: 1, img: 'https://upload.wikimedia.org/wikipedia/commons/f/fd/Pents01.jpg', meaning: '物质机会，繁荣，显化', type: 'pentacles' },
+            { name: '星币二', num: 2, img: 'https://upload.wikimedia.org/wikipedia/commons/9/9f/Pents02.jpg', meaning: '平衡，适应，多任务', type: 'pentacles' },
+            { name: '星币三', num: 3, img: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Pents03.jpg', meaning: '团队合作，技能，工艺', type: 'pentacles' },
+            { name: '星币四', num: 4, img: 'https://upload.wikimedia.org/wikipedia/commons/3/35/Pents04.jpg', meaning: '保守，控制，囤积', type: 'pentacles' },
+            { name: '星币五', num: 5, img: 'https://upload.wikimedia.org/wikipedia/commons/9/96/Pents05.jpg', meaning: '贫困，困难，孤立', type: 'pentacles' },
+            { name: '星币六', num: 6, img: 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Pents06.jpg', meaning: '慷慨，给予，分享', type: 'pentacles' },
+            { name: '星币七', num: 7, img: 'https://upload.wikimedia.org/wikipedia/commons/6/6a/Pents07.jpg', meaning: '评估，耐心，投资', type: 'pentacles' },
+            { name: '星币八', num: 8, img: 'https://upload.wikimedia.org/wikipedia/commons/4/49/Pents08.jpg', meaning: '技能，勤奋，专注', type: 'pentacles' },
+            { name: '星币九', num: 9, img: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Pents09.jpg', meaning: '独立，奢侈，自给自足', type: 'pentacles' },
+            { name: '星币十', num: 10, img: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Pents10.jpg', meaning: '财富，遗产，家族', type: 'pentacles' },
+            { name: '星币侍从', num: 11, img: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/Pents11.jpg', meaning: '机会，学习，务实', type: 'pentacles' },
+            { name: '星币骑士', num: 12, img: 'https://upload.wikimedia.org/wikipedia/commons/d/d5/Pents12.jpg', meaning: '勤奋，可靠，稳定', type: 'pentacles' },
+            { name: '星币皇后', num: 13, img: 'https://upload.wikimedia.org/wikipedia/commons/8/88/Pents13.jpg', meaning: '滋养，务实，慷慨', type: 'pentacles' },
+            { name: '星币国王', num: 14, img: 'https://upload.wikimedia.org/wikipedia/commons/1/1c/Pents14.jpg', meaning: '成功，财富，商业头脑', type: 'pentacles' }
+        ];
+        
+        // 经典牌阵定义
+        const spreadTypes = [
+            {
+                id: 'single',
+                name: '单张牌',
+                icon: '🃏',
+                count: 1,
+                desc: '简洁明了，适合快速指引',
+                positions: ['指引']
+            },
+            {
+                id: 'three',
+                name: '时间之流',
+                icon: '⏳',
+                count: 3,
+                desc: '过去、现在、未来的经典牌阵',
+                positions: ['过去', '现在', '未来']
+            },
+            {
+                id: 'five',
+                name: '十字牌阵',
+                icon: '✝️',
+                count: 5,
+                desc: '深入分析问题的核心与走向',
+                positions: ['现状', '挑战', '过去', '未来', '结果']
+            },
+            {
+                id: 'seven',
+                name: '马蹄牌阵',
+                icon: '🧲',
+                count: 7,
+                desc: '全方位审视问题的七个面向',
+                positions: ['过去', '现在', '未来', '建议', '环境', '希望', '结果']
+            },
+            {
+                id: 'celtic',
+                name: '凯尔特十字',
+                icon: '☸️',
+                count: 10,
+                desc: '最经典的塔罗牌阵，全面解读',
+                positions: ['现状', '挑战', '根基', '过去', '目标', '未来', '自我', '环境', '希望', '结果']
+            },
+            {
+                id: 'horseshoe',
+                name: '关系牌阵',
+                icon: '💞',
+                count: 7,
+                desc: '专门解读人际关系与感情',
+                positions: ['你', '对方', '关系', '障碍', '外在影响', '希望', '结果']
+            },
+            {
+                id: 'career',
+                name: '事业牌阵',
+                icon: '💼',
+                count: 5,
+                desc: '专注事业发展的指引',
+                positions: ['现状', '障碍', '优势', '建议', '结果']
+            },
+            {
+                id: 'year',
+                name: '年度运势',
+                icon: '📅',
+                count: 12,
+                desc: '逐月解读一整年的运势走向',
+                positions: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+            },
+            {
+                id: 'tree',
+                name: '生命之树',
+                icon: '🌳',
+                count: 11,
+                desc: '深入探索身心灵的平衡',
+                positions: ['根源', '创造力', '智慧', '慈悲', '力量', '美', '胜利', '荣耀', '基础', '王国', '皇冠']
+            }
+        ];
+
+        // 当前选择的牌阵
+        let currentSpread = spreadTypes[1]; // 默认时间之流
+
+        // 牌阵位置名称（动态根据牌阵）
+        let spreadPositions = currentSpread.positions;
+
+        // 状态
+        let currentState = 'input';
+        let selectedCards = [];
+        let selectedCardIndices = [];
+        let userQuestion = '';
+        let shuffledOrder = [];
+        
+        // 初始化星空背景
+        function initStars() {
+            const starsBg = document.getElementById('starsBg');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.opacity = Math.random() * 0.8 + 0.2;
+                starsBg.appendChild(star);
+            }
+        }
+        
+        // 返回上一页
+        function goBack() {
+            // 如果在 iframe 中，通知父页面关闭
+            if (window.parent !== window) {
+                window.parent.postMessage('closeTarotDivination', '*');
+                return;
+            }
+            window.history.back();
+        }
+        
+        // 渲染牌阵选择列表
+        function renderSpreadList() {
+            const list = document.getElementById('spreadList');
+            list.innerHTML = spreadTypes.map(spread => `
+                <div class="spread-item" onclick="selectSpread('${spread.id}')">
+                    <div class="spread-item-icon">${spread.icon}</div>
+                    <div class="spread-item-info">
+                        <div class="spread-item-name">${spread.name}</div>
+                        <div class="spread-item-desc">${spread.desc}</div>
+                    </div>
+                    <div class="spread-item-count">${spread.count}张牌</div>
+                </div>
+            `).join('');
+        }
+
+        // 选择牌阵
+        function selectSpread(spreadId) {
+            currentSpread = spreadTypes.find(s => s.id === spreadId);
+            spreadPositions = currentSpread.positions;
+
+            document.getElementById('spreadModal').classList.remove('show');
+
+            // 进入洗牌阶段
+            currentState = 'shuffling';
+            document.getElementById('questionSection').classList.add('hidden');
+            document.querySelector('.deck-hint').innerHTML = '点击洗牌<br>展开全部78张牌';
+            showStatus(`已选择「${currentSpread.name}」，需要抽取${currentSpread.count}张牌。点击牌组开始洗牌`);
+        }
+
+        // 开始占卜
+        async function startDivination() {
+            const question = document.getElementById('questionInput').value.trim();
+            if (!question) {
+                showStatus('请先输入你的问题');
+                return;
+            }
+
+            userQuestion = question;
+
+            // 显示牌阵选择弹窗
+            renderSpreadList();
+            document.getElementById('spreadModal').classList.add('show');
+
+            // 开始预加载所有图片（在后台进行）
+            const imageUrls = tarotCards.map(card => card.img);
+            preloadImages(imageUrls, 3).then(() => {
+                console.log('所有塔罗牌图片预加载完成');
+            });
+        }
+        
+        // 洗牌动画
+        function shuffleDeck() {
+            if (currentState === 'input') {
+                showStatus('请先输入你的问题');
+                return;
+            }
+            
+            if (currentState !== 'shuffling') return;
+            
+            const deck = document.getElementById('deckContainer');
+            const shuffleArea = document.getElementById('shuffleArea');
+            
+            deck.classList.add('hidden');
+            
+            // 创建78张飞散的牌
+            const cards = [];
+            for (let i = 0; i < 30; i++) { // 显示30张代表整副牌
+                const card = document.createElement('div');
+                card.className = 'shuffle-card';
+                card.style.zIndex = 30 - i;
+                shuffleArea.appendChild(card);
+                cards.push(card);
+            }
+            
+            showStatus('洗牌中...感受能量的流动');
+            
+            // 散开动画
+            setTimeout(() => {
+                cards.forEach((card, i) => {
+                    const angle = (i / 30) * Math.PI * 2;
+                    const radius = 150 + Math.random() * 100;
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    const rot = Math.random() * 360;
+                    
+                    card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                    card.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+                });
+                createMagicParticles(30);
+            }, 100);
+            
+            // 打乱动画
+            setTimeout(() => {
+                showStatus('塔罗牌正在重新排列...');
+                for (let round = 0; round < 3; round++) {
+                    setTimeout(() => {
+                        cards.forEach((card, i) => {
+                            const randomX = (Math.random() - 0.5) * 300;
+                            const randomY = (Math.random() - 0.5) * 400;
+                            const randomRot = Math.random() * 720 - 360;
+                            
+                            card.style.transition = 'all 0.4s ease-out';
+                            card.style.transform = `translate(${randomX}px, ${randomY}px) rotate(${randomRot}deg)`;
+                        });
+                        createMagicParticles(20);
+                    }, round * 400);
+                }
+            }, 800);
+            
+            // 收拢并展开扇形
+            setTimeout(() => {
+                showStatus('牌阵即将展开...');
+                cards.forEach((card, i) => {
+                    setTimeout(() => {
+                        card.style.transition = 'all 0.3s ease-in';
+                        card.style.transform = 'translate(0, 0) rotate(0deg) scale(0)';
+                        card.style.opacity = '0';
+                    }, i * 20);
+                });
+                
+                setTimeout(() => {
+                    shuffleArea.innerHTML = '';
+                    currentState = 'selecting';
+                    spreadFanCards();
+                }, 800);
+            }, 2200);
+        }
+        
+        // 展开扇形牌阵
+        function spreadFanCards() {
+            const fanArea = document.getElementById('fanArea');
+            const fanUpper = document.getElementById('fanUpper');
+            const fanLower = document.getElementById('fanLower');
+            const counter = document.getElementById('selectionCounter');
+            
+            // 打乱牌序
+            shuffledOrder = [...tarotCards].map((card, i) => ({ ...card, originalIndex: i }));
+            shuffledOrder.sort(() => Math.random() - 0.5);
+            
+            // 清空
+            fanUpper.innerHTML = '';
+            fanLower.innerHTML = '';
+            
+            // 上半部分39张牌
+            const upperCount = Math.ceil(shuffledOrder.length / 2);
+            const upperCards = shuffledOrder.slice(0, upperCount);
+            const lowerCards = shuffledOrder.slice(upperCount);
+            
+            // 创建上半扇形
+            upperCards.forEach((card, i) => {
+                createFanCard(card, i, upperCount, fanUpper, true);
+            });
+            
+            // 创建下半扇形
+            lowerCards.forEach((card, i) => {
+                createFanCard(card, i, lowerCards.length, fanLower, false);
+            });
+            
+            // 显示
+            setTimeout(() => {
+                fanArea.classList.add('show');
+                counter.classList.add('show');
+                updateCounter();
+                showStatus(`从78张牌中选择${currentSpread.count}张，进行「${currentSpread.name}」占卜`);
+            }, 500);
+        }
+        
+        // 创建扇形卡牌
+        function createFanCard(card, index, total, container, isUpper) {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'fan-card';
+            cardEl.dataset.index = index;
+            cardEl.dataset.originalIndex = card.originalIndex;
+            
+            // 计算扇形位置
+            const fanAngle = 140; // 扇形总角度
+            const startAngle = -fanAngle / 2;
+            const angleStep = fanAngle / (total - 1);
+            const angle = startAngle + index * angleStep;
+            
+            // 半径根据数量调整
+            const radius = isUpper ? 180 : 160;
+            
+            // 计算位置
+            const rad = (angle * Math.PI) / 180;
+            const x = Math.sin(rad) * radius;
+            const y = isUpper ? -Math.cos(rad) * radius * 0.3 : Math.cos(rad) * radius * 0.3;
+            
+            cardEl.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+            
+            // 先创建牌背，图片加载后再显示
+            cardEl.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-back-face"></div>
+                    <div class="card-front">
+                        <img class="card-front-img" src="${card.img}" alt="${card.name}" loading="eager" style="opacity: 0; transition: opacity 0.3s ease;">
+                        <div class="card-front-name">${card.name}</div>
+                    </div>
+                </div>
+            `;
+            
+            // 图片加载完成后的处理
+            const img = cardEl.querySelector('.card-front-img');
+            if (imageCache.has(card.img)) {
+                // 如果已缓存，直接显示
+                img.style.opacity = '1';
+            } else {
+                // 否则等待加载完成
+                img.onload = () => {
+                    img.style.opacity = '1';
+                    imageCache.set(card.img, img);
+                };
+                img.onerror = () => {
+                    // 加载失败时显示备用内容
+                    img.style.display = 'none';
+                    const fallback = document.createElement('div');
+                    fallback.style.cssText = 'width: 100%; height: 85%; background: linear-gradient(135deg, #8a2be2 0%, #4a0080 100%); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
+                    fallback.textContent = card.name.charAt(0);
+                    img.parentNode.insertBefore(fallback, img);
+                };
+            }
+            
+            cardEl.addEventListener('click', () => selectFanCard(cardEl, card, card.originalIndex));
+            container.appendChild(cardEl);
+            
+            // 入场动画
+            cardEl.style.opacity = '0';
+            setTimeout(() => {
+                cardEl.style.opacity = '1';
+            }, index * 10);
+        }
+        
+        // 选择卡牌
+        function selectFanCard(cardEl, card, index) {
+            if (currentState !== 'selecting') return;
+
+            const maxCards = currentSpread.count;
+
+            if (selectedCards.length >= maxCards) {
+                showStatus(`已经选择了${maxCards}张牌，点击已选中的牌可以取消`);
+                return;
+            }
+
+            const existingIndex = selectedCardIndices.indexOf(index);
+            if (existingIndex !== -1) {
+                selectedCards.splice(existingIndex, 1);
+                selectedCardIndices.splice(existingIndex, 1);
+                cardEl.classList.remove('selected', 'flipped', 'reversed');
+                updateCounter();
+                showStatus(`已取消选择，还需选择 ${maxCards - selectedCards.length} 张牌`);
+                return;
+            }
+
+            // 添加到已选，随机决定正位或逆位（50%概率）
+            const isReversed = Math.random() < 0.5;
+            selectedCardIndices.push(index);
+            selectedCards.push({
+                ...card,
+                position: spreadPositions[selectedCards.length],
+                order: selectedCards.length,
+                isReversed: isReversed
+            });
+
+            // 根据正逆位设置翻转样式
+            cardEl.classList.add('selected', 'flipped');
+            if (isReversed) {
+                cardEl.classList.add('reversed');
+            }
+            createMagicParticles(10, cardEl);
+
+            updateCounter();
+
+            if (selectedCards.length >= maxCards) {
+                showStatus(`已选择${maxCards}张牌，正在揭示命运...`);
+
+                setTimeout(() => {
+                    document.querySelectorAll('.fan-card:not(.selected)').forEach(card => {
+                        card.classList.add('disabled');
+                    });
+                }, 500);
+
+                setTimeout(() => {
+                    currentState = 'revealed';
+                    showResult();
+                }, 1500);
+            } else {
+                showStatus(`已选择 ${selectedCards.length}/${maxCards} 张牌，继续选择`);
+            }
+        }
+
+        // 更新计数器
+        function updateCounter() {
+            const counter = document.getElementById('selectionCounter');
+            counter.textContent = `已选择 ${selectedCards.length}/${currentSpread.count} 张牌`;
+        }
+        
+        // 创建魔法粒子
+        function createMagicParticles(count = 20, targetEl = null) {
+            let centerX, centerY;
+            
+            if (targetEl) {
+                const rect = targetEl.getBoundingClientRect();
+                centerX = rect.left + rect.width / 2;
+                centerY = rect.top + rect.height / 2;
+            } else {
+                centerX = window.innerWidth / 2;
+                centerY = window.innerHeight / 2;
+            }
+            
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'magic-particle';
+                particle.style.left = centerX + 'px';
+                particle.style.top = centerY + 'px';
+                
+                const angle = (Math.PI * 2 * i) / count;
+                const distance = 100 + Math.random() * 150;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance;
+                
+                particle.style.setProperty('--tx', tx + 'px');
+                particle.style.setProperty('--ty', ty + 'px');
+                document.body.appendChild(particle);
+                
+                setTimeout(() => particle.remove(), 1500);
+            }
+        }
+        
+        // 显示结果
+        function showResult() {
+            const resultSection = document.getElementById('resultSection');
+            const resultCards = document.getElementById('resultCards');
+            const resultQuestion = document.getElementById('resultQuestion');
+            const resultText = document.getElementById('resultText');
+            
+            const orderedCards = selectedCards.sort((a, b) => a.order - b.order);
+            
+            resultCards.innerHTML = orderedCards.map((card, i) => `
+                <div class="result-card ${card.isReversed ? 'reversed' : ''}">
+                    <img class="result-card-img" src="${card.img}" alt="${card.name}" style="${card.isReversed ? 'transform: rotate(180deg);' : ''}">
+                    <div class="result-card-name">${card.name}${card.isReversed ? ' (逆位)' : ' (正位)'}</div>
+                    <div class="result-card-position">${spreadPositions[i]}</div>
+                </div>
+            `).join('');
+            
+            resultQuestion.textContent = `「${userQuestion}」`;
+            
+            const interpretation = generateInterpretation(orderedCards);
+            resultText.innerHTML = interpretation;
+            
+            resultSection.classList.add('show');
+        }
+        
+        // 生成解读
+        function generateInterpretation(cards) {
+            // 逆位含义映射（简化版）
+            const reversedMeanings = {
+                '愚者': '鲁莽，冒险，缺乏计划',
+                '魔术师': '欺骗，缺乏自信，能力未发挥',
+                '女祭司': '表面化，忽视直觉，秘密暴露',
+                '皇后': '依赖，过度保护，创造力受阻',
+                '皇帝': '专制，僵化，滥用权力',
+                '教皇': '叛逆，非传统，个人信仰',
+                '恋人': '不和谐，错误选择，关系失衡',
+                '战车': '失控，方向不明，意志力薄弱',
+                '力量': '软弱，缺乏自信，自我怀疑',
+                '隐者': '孤独，逃避，拒绝内省',
+                '命运之轮': '抗拒改变，厄运，循环中断',
+                '正义': '不公，偏见，逃避责任',
+                '倒吊人': '固执，无效牺牲，抗拒暂停',
+                '死神': '抗拒结束，停滞，害怕改变',
+                '节制': '极端，失衡，过度放纵',
+                '恶魔': '觉醒，摆脱束缚，重获自由',
+                '塔': '避免灾难，渐进改变，预警',
+                '星星': '失去信心，绝望，希望破灭',
+                '月亮': '恐惧消散，真相大白，幻觉破除',
+                '太阳': '暂时的快乐，过度乐观，自我膨胀',
+                '审判': '逃避召唤，自我怀疑，拒绝改变',
+                '世界': '未完成，延迟，缺乏成就感',
+                '权杖首牌': '延迟，缺乏灵感，机会错失',
+                '权杖二': '恐惧改变，计划失败，视野狭窄',
+                '权杖三': '延迟，合作问题，视野受限',
+                '权杖四': '不稳定，家庭问题，庆祝中断',
+                '权杖五': '避免冲突，和解，内心平静',
+                '权杖六': '失败，骄傲，公众羞辱',
+                '权杖七': '放弃，不堪重负，失败',
+                '权杖八': '延迟，阻碍，混乱',
+                '权杖九': '疲惫，放弃，防御崩溃',
+                '权杖十': '放下负担，委派，减轻压力',
+                '权杖侍从': '坏消息，缺乏方向，拖延',
+                '权杖骑士': '冲动，鲁莽，行动失败',
+                '权杖皇后': '嫉妒，不安全感，专横',
+                '权杖国王': '暴政，冲动，缺乏远见',
+                '圣杯首牌': '情感阻塞，空虚，失去爱',
+                '圣杯二': '分离，不和谐，关系破裂',
+                '圣杯三': '过度社交，孤立，孤独',
+                '圣杯四': '觉醒，新机会，接受',
+                '圣杯五': '接受失去，宽恕，向前看',
+                '圣杯六': '被困在过去，成长，成熟',
+                '圣杯七': '清醒，做出选择，面对现实',
+                '圣杯八': '坚持，恐惧改变，停滞',
+                '圣杯九': '贪婪，不满，愿望未实现',
+                '圣杯十': '家庭问题，不和谐，破裂',
+                '圣杯侍从': '情感不成熟，坏消息，拖延',
+                '圣杯骑士': '承诺恐惧，不诚实，情绪化',
+                '圣杯皇后': '情绪操控，过度敏感，依赖',
+                '圣杯国王': '情绪控制，操纵，不诚实',
+                '宝剑首牌': '混乱，缺乏清晰，思维模糊',
+                '宝剑二': '真相大白，决定，信息揭示',
+                '宝剑三': '恢复，宽恕，释放痛苦',
+                '宝剑四': '不安，缺乏休息，焦虑',
+                '宝剑五': '和解，妥协，解决冲突',
+                '宝剑六': '困难过渡，延迟，被困',
+                '宝剑七': '良心发现，诚实，策略失败',
+                '宝剑八': '释放，自由，新视角',
+                '宝剑九': '希望，焦虑缓解，噩梦结束',
+                '宝剑十': '恢复，重生，结束痛苦',
+                '宝剑侍从': '真相，诚实，新想法',
+                '宝剑骑士': '冲动，鲁莽，思维混乱',
+                '宝剑皇后': '过于情绪化，冷酷，残忍',
+                '宝剑国王': '不公正，滥用权力，残忍',
+                '星币首牌': '错失机会，贪婪，物质损失',
+                '星币二': '失衡，过度承诺，混乱',
+                '星币三': '缺乏团队合作，平庸，技能不足',
+                '星币四': '慷慨，给予，释放控制',
+                '星币五': '恢复，新机会，结束困难',
+                '星币六': '自私，债务，不平等',
+                '星币七': '不耐烦，缺乏远见，失败',
+                '星币八': '缺乏专注，平庸，技能不足',
+                '星币九': '依赖，缺乏自律，财务问题',
+                '星币十': '财务失败，家庭问题，失去稳定',
+                '星币侍从': '缺乏进展，拖延，机会错失',
+                '星币十一': '懒惰，不可靠，缺乏野心',
+                '星币皇后': '财务依赖，过度保护，占有欲',
+                '星币国王': '物质主义，贪婪，财务损失'
+            };
+            
+            function getCardInterpretation(card) {
+                if (card.isReversed) {
+                    const reversedMeaning = reversedMeanings[card.name] || '能量受阻，需要重新审视';
+                    return {
+                        meaning: reversedMeaning,
+                        position: '逆位'
+                    };
+                }
+                return {
+                    meaning: card.meaning,
+                    position: '正位'
+                };
+            }
+
+            // 生成每张牌的解读段落
+            let interpretationHTML = '';
+            cards.forEach((card, i) => {
+                const info = getCardInterpretation(card);
+                const position = spreadPositions[i] || `第${i + 1}张`;
+                interpretationHTML += `<p><strong>【${card.name}】${info.position} - ${position}：</strong>${info.meaning}。</p>`;
+            });
+
+            // 综合解读
+            const cardNames = cards.map(c => `${c.name}(${c.isReversed ? '逆位' : '正位'})`).join('、');
+            interpretationHTML += `<p><strong>综合解读：</strong>「${currentSpread.name}」牌阵为你揭示了${cards.length}个面向的能量。${cardNames}共同编织出你当前问题的全貌。相信你的直觉，宇宙正在以它独特的方式引导着你。记住，塔罗牌展示的是可能的趋势，而你的选择和行动才是最终决定命运的关键。</p>`;
+
+            return interpretationHTML;
+        }
+        
+        // 获取AI大师解读
+        async function getAIMasterInterpretation() {
+            const btn = document.getElementById('aiMasterBtn');
+            const aiSection = document.getElementById('aiInterpretation');
+            const aiContent = document.getElementById('aiInterpretationContent');
+            
+            // 防止重复点击
+            if (btn.disabled) return;
+            
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btn.textContent = '大师正在解读中...';
+            
+            try {
+                // 获取API设置
+                const apiConfig = await loadApiSettings();
+                
+                console.log('【塔罗牌】获取到的API配置:', {
+                    apiUrl: apiConfig.apiUrl,
+                    model: apiConfig.model,
+                    hasApiKey: !!apiConfig.apiKey,
+                    apiKeyLength: apiConfig.apiKey ? apiConfig.apiKey.length : 0
+                });
+                
+                if (!apiConfig.apiKey) {
+                    const errorMsg = '未找到API密钥设置。\n\n请先在"呼叫爱人"页面设置API信息，设置会自动同步到塔罗牌功能。\n\n设置路径：呼叫爱人 → 设置 → API设置';
+                    alert(errorMsg);
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                    btn.textContent = '请大师解读';
+                    return;
+                }
+                
+                // 构建提示词
+                const prompt = buildAIPrompt();
+                
+                // 调用API
+                const response = await callAIAPI(apiConfig, prompt);
+                
+                // 显示AI解读
+                aiContent.innerHTML = formatAIResponse(response);
+                aiSection.style.display = 'block';
+                
+                // 滚动到AI解读区域
+                aiSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                btn.textContent = '已获取大师解读';
+                
+            } catch (error) {
+                console.error('AI解读失败:', error);
+                aiContent.innerHTML = '<p style="color: #ff6666;">大师解读暂时不可用，请检查API设置或稍后重试。</p>';
+                aiSection.style.display = 'block';
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btn.textContent = '重新请求大师解读';
+            }
+        }
+        
+        // 加载API设置
+        async function loadApiSettings() {
+            console.log('【塔罗牌】开始加载API设置...');
+            
+            // 尝试从localforage加载
+            try {
+                if (typeof localforage !== 'undefined') {
+                    const settings = await localforage.getItem('appSettings');
+                    console.log('【塔罗牌】localforage读取结果:', settings);
+                    
+                    if (settings && settings.api) {
+                        const config = {
+                            apiKey: settings.api.apiKey || '',
+                            apiUrl: settings.api.baseUrl || 'https://api.openai.com/v1',
+                            model: settings.api.model || 'gpt-4o-mini'
+                        };
+                        console.log('【塔罗牌】从localforage加载API配置:', {
+                            apiUrl: config.apiUrl,
+                            model: config.model,
+                            hasApiKey: !!config.apiKey
+                        });
+                        return config;
+                    }
+                } else {
+                    console.log('【塔罗牌】localforage未定义，跳过');
+                }
+            } catch (e) {
+                console.error('【塔罗牌】localforage加载失败:', e);
+            }
+            
+            // 降级到localStorage
+            try {
+                const rawData = localStorage.getItem('appSettings');
+                console.log('【塔罗牌】localStorage原始数据:', rawData ? '存在' : '不存在');
+                
+                if (rawData) {
+                    const settings = JSON.parse(rawData);
+                    console.log('【塔罗牌】localStorage解析结果:', settings);
+                    
+                    if (settings.api) {
+                        const config = {
+                            apiKey: settings.api.apiKey || '',
+                            apiUrl: settings.api.baseUrl || 'https://api.openai.com/v1',
+                            model: settings.api.model || 'gpt-4o-mini'
+                        };
+                        console.log('【塔罗牌】从localStorage加载API配置:', {
+                            apiUrl: config.apiUrl,
+                            model: config.model,
+                            hasApiKey: !!config.apiKey
+                        });
+                        return config;
+                    }
+                }
+            } catch (e) {
+                console.error('【塔罗牌】localStorage加载失败:', e);
+            }
+            
+            // 尝试直接读取可能的其他存储键
+            try {
+                const apiKey = localStorage.getItem('api_key') || localStorage.getItem('apiKey');
+                const apiUrl = localStorage.getItem('api_url') || localStorage.getItem('apiUrl') || localStorage.getItem('api_base_url');
+                const model = localStorage.getItem('api_model') || localStorage.getItem('model');
+                
+                if (apiKey) {
+                    console.log('【塔罗牌】从独立存储键加载API配置');
+                    return {
+                        apiKey: apiKey,
+                        apiUrl: apiUrl || 'https://api.openai.com/v1',
+                        model: model || 'gpt-4o-mini'
+                    };
+                }
+            } catch (e) {
+                console.error('【塔罗牌】独立存储键读取失败:', e);
+            }
+            
+            console.log('【塔罗牌】未能找到API配置');
+            return { apiKey: '', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' };
+        }
+        
+        // 构建AI提示词
+        function buildAIPrompt() {
+            const orderedCards = selectedCards.sort((a, b) => a.order - b.order);
+
+            const getCardInfo = (card) => {
+                const position = card.isReversed ? '逆位' : '正位';
+                return `${card.name}(${position})`;
+            };
+
+            // 构建牌阵描述
+            let cardsDescription = '';
+            orderedCards.forEach((card, i) => {
+                const position = spreadPositions[i] || `第${i + 1}张`;
+                cardsDescription += `- ${position}：${getCardInfo(card)}\n`;
+            });
+
+            return `你是一个专业的塔罗牌占卜师，拥有深厚的塔罗牌知识和丰富的占卜经验。
+
+用户的问题是：「${userQuestion}」
+
+使用的牌阵是「${currentSpread.name}」，共${currentSpread.count}张牌。
+
+抽到的牌分别是：
+${cardsDescription}
+
+请从专业占卜师的角度，客观、真实地解读这个牌阵对用户问题的启示。
+
+解读要求：
+1. 客观分析，不要刻意讨好用户
+2. 结合正逆位的不同含义
+3. 给出具体、有深度的洞察
+4. 可以指出问题或挑战，但要建设性
+5. 语言风格神秘而专业，像一位睿智的占卜大师
+6. 根据「${currentSpread.name}」牌阵的特点，分别解读每个位置的含义
+
+请用中文回答，分段阐述每张牌的影响，最后给出综合建议。`;
+        }
+        
+        // 调用AI API
+        async function callAIAPI(config, prompt) {
+            const response = await fetch(`${config.apiUrl}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: config.model,
+                    messages: [
+                        { role: 'system', content: '你是一位专业的塔罗牌占卜大师，拥有神秘而深邃的智慧。' },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.8,
+                    max_tokens: 1500
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data.choices[0].message.content;
+        }
+        
+        // 格式化AI响应
+        function formatAIResponse(text) {
+            // 将换行符转换为段落
+            const paragraphs = text.split('\n\n').filter(p => p.trim());
+            return paragraphs.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+        }
+        
+        // 关闭结果
+        function closeResult() {
+            const resultSection = document.getElementById('resultSection');
+            const fanArea = document.getElementById('fanArea');
+            const counter = document.getElementById('selectionCounter');
+            const deck = document.getElementById('deckContainer');
+            const aiSection = document.getElementById('aiInterpretation');
+            const aiContent = document.getElementById('aiInterpretationContent');
+            const aiBtn = document.getElementById('aiMasterBtn');
+            const spreadModal = document.getElementById('spreadModal');
+
+            resultSection.classList.remove('show');
+            fanArea.classList.remove('show');
+            counter.classList.remove('show');
+            spreadModal.classList.remove('show');
+
+            // 重置AI解读区域
+            aiSection.style.display = 'none';
+            aiContent.innerHTML = '';
+            aiBtn.disabled = false;
+            aiBtn.classList.remove('loading');
+            aiBtn.textContent = '请大师解读';
+
+            currentState = 'input';
+            selectedCards = [];
+            selectedCardIndices = [];
+            userQuestion = '';
+            shuffledOrder = [];
+
+            document.getElementById('questionSection').classList.remove('hidden');
+            document.getElementById('questionInput').value = '';
+            document.getElementById('fanUpper').innerHTML = '';
+            document.getElementById('fanLower').innerHTML = '';
+            deck.classList.remove('hidden');
+            document.querySelector('.deck-hint').innerHTML = '点击洗牌<br>展开全部78张牌';
+
+            hideStatus();
+        }
+        
+        // 显示状态提示
+        function showStatus(text) {
+            const statusEl = document.getElementById('statusText');
+            statusEl.textContent = text;
+            statusEl.classList.add('show');
+            
+            setTimeout(() => {
+                if (statusEl.textContent === text) {
+                    statusEl.classList.remove('show');
+                }
+            }, 3000);
+        }
+        
+        // 隐藏状态提示
+        function hideStatus() {
+            const statusEl = document.getElementById('statusText');
+            statusEl.classList.remove('show');
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initStars();
+        });
+    </script>
+</body>
+</html>

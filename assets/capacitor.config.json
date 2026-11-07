@@ -1,0 +1,70 @@
+{
+	"appId": "com.voicechat.app",
+	"appName": "守护",
+	"webDir": "www",
+	"android": {
+		"allowMixedContent": true,
+		"webContentsDebuggingEnabled": true
+	},
+	"server": {
+		"cleartext": true
+	},
+	"plugins": {
+		"CapacitorHttp": {
+			"enabled": true
+		},
+		"Keyboard": {
+			"resize": "none",
+			"style": "dark",
+			"resizeOnFullScreen": false
+		},
+		"LocalNotifications": {
+			"smallIcon": "ic_stat_notify",
+			"iconColor": "#FFFFFF",
+			"sound": "beep.wav"
+		},
+		"Filesystem": {
+			"permissions": [
+				"read",
+				"write",
+				"append",
+				"delete",
+				"getUri",
+				"readdir",
+				"mkdir",
+				"rmdir",
+				"stat",
+				"copy",
+				"rename"
+			]
+		},
+		"Share": {
+			"permissions": [
+				"share"
+			]
+		},
+		"BackgroundGeolocation": {
+			"backgroundMessage": "守护正在后台记录位置",
+			"backgroundTitle": "足迹记录中",
+			"requestPermissions": true
+		},
+		"Geolocation": {
+			"enabled": true
+		},
+		"FilePicker": {
+			"enabled": true
+		},
+		"CompanionFloating": {
+			"enabled": true
+		},
+		"CompanionBall": {
+			"enabled": true
+		},
+		"Screenshot": {
+			"enabled": true
+		},
+		"WCDB": {
+			"enabled": true
+		}
+	}
+}

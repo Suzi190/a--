@@ -1,0 +1,123 @@
+{
+	"Version": 3,
+	"Meta": {
+		"Duration": 3.333,
+		"Fps": 30.0,
+		"Loop": true,
+		"AreBeziersRestricted": true,
+		"CurveCount": 4,
+		"TotalSegmentCount": 13,
+		"TotalPointCount": 35,
+		"UserDataCount": 0,
+		"TotalUserDataSize": 0
+	},
+	"Curves": [
+		{
+			"Target": "Parameter",
+			"Id": "ParamEyeROpen",
+			"Segments": [
+				0,
+				0,
+				1,
+				0.556,
+				0,
+				1.111,
+				1,
+				1.667,
+				1,
+				1,
+				2.167,
+				1,
+				2.667,
+				0,
+				3.167,
+				0,
+				0,
+				3.333,
+				0
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Id": "ParamEyeRSmile",
+			"Segments": [
+				0,
+				0,
+				0,
+				0.833,
+				0,
+				1,
+				1.056,
+				0,
+				1.278,
+				1,
+				1.5,
+				1,
+				1,
+				1.667,
+				1,
+				1.833,
+				0,
+				2,
+				0,
+				1,
+				2.411,
+				0,
+				2.822,
+				1,
+				3.233,
+				1,
+				0,
+				3.333,
+				1
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Id": "ParamBreath",
+			"Segments": [
+				0,
+				0,
+				1,
+				0.267,
+				0,
+				0.533,
+				1,
+				0.8,
+				1,
+				1,
+				1.078,
+				1,
+				1.356,
+				0,
+				1.633,
+				0,
+				1,
+				1.922,
+				0,
+				2.211,
+				1,
+				2.5,
+				1,
+				1,
+				2.778,
+				1,
+				3.056,
+				0,
+				3.333,
+				0
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Id": "ParamHairFront",
+			"Segments": [
+				0,
+				0,
+				0,
+				3.333,
+				0
+			]
+		}
+	]
+}

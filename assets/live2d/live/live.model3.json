@@ -1,0 +1,23 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "live.moc3",
+		"Textures": [
+			"live.1024/texture_00.png"
+		],
+		"Physics": "live.physics3.json",
+		"DisplayInfo": "live.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		}
+	]
+}
