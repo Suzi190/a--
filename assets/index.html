@@ -1140,6 +1140,9 @@
     
     <!-- Capacitor Core -->
     <script src="capacitor.js" onerror="console.error('capacitor.js加载失败');window.__capacitorLoadError=true;"></script>
+
+    <!-- 原生壳脚本（只在该 APK 里生效：导出落盘、返回键/侧滑逐层返回） -->
+    <script src="js/native-shell.js" onerror="console.error('native-shell.js加载失败')"></script>
     
     <!-- 数据库模块 -->
     <script src="js/db.js" onerror="console.error('db.js加载失败')"></script>
@@ -142100,8 +142103,12 @@ ${charactersInfo || '暂无其他角色'}
             var isLocalDev = location.protocol === 'file:' ||
                 location.hostname === 'localhost' ||
                 location.hostname === '127.0.0.1';
+            // APK 里永远不显示（打包脚本也会整块删掉，这里是第二道保险）
+            var isNativeApp = !!(window.Capacitor &&
+                typeof window.Capacitor.isNativePlatform === 'function' &&
+                window.Capacitor.isNativePlatform());
 
-            if (stored === '1' || (stored !== '0' && isLocalDev)) {
+            if (!isNativeApp && (stored === '1' || (stored !== '0' && isLocalDev))) {
                 btn.style.display = 'flex';
             }
         })();

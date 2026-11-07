@@ -1,0 +1,23 @@
+{
+  "appId": "com.shouhu.app",
+  "appName": "守护",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#000000",
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": false,
+    "captureInput": false,
+    "adjustMarginsForEdgeToEdge": "disable",
+    "useLegacyBridge": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "none",
+      "resizeOnFullScreen": true
+    }
+  }
+}

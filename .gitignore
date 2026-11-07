@@ -1,0 +1,29 @@
+# 依赖
+node_modules/
+
+# Capacitor 构建产物（www 由 scripts/prepare-www.mjs 从 assets/ 现生成）
+www/
+dist/
+
+# Android 构建产物
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/local.properties
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/capacitor-cordova-android-plugins/
+
+# 产物
+*.apk
+*.aab
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+
+# 构建日志
+*.log
+

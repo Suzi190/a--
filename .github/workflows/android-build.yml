@@ -1,0 +1,123 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # 固定签名：GitHub runner 上的 ~/.android/debug.keystore 每次构建都会重新生成，
+      # 每个 APK 签名都不一样 —— 手机上覆盖安装新版会报「应用未安装」，只能卸载重装（数据全丢）。
+      # 首次构建生成一个并提交回仓库，之后一直复用同一个。
+      - name: Ensure fixed signing keystore
+        run: |
+          KS=android/app/debug.keystore
+          if [ ! -f "$KS" ]; then
+            keytool -genkeypair -v -keystore "$KS" -storetype JKS \
+              -storepass shouhudebug -keypass shouhudebug \
+              -alias shouhu -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=shouhu, OU=shouhu, O=shouhu, L=Beijing, ST=Beijing, C=CN"
+            git config user.name "shouhu-ci"
+            git config user.email "shouhu-ci@users.noreply.github.com"
+            git add -f "$KS"
+            git commit -m "chore: 固定 APK 签名 keystore（保证覆盖安装、升级不丢数据）[skip ci]"
+            git push origin HEAD:main
+          fi
+          ls -l "$KS"
+
+      - name: Android SDK packages
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" 2>/dev/null || true
+          ls "$ANDROID_HOME/build-tools" 2>/dev/null || true
+          # runner 自带 cmdline-tools 的版本号会变，取第一个可用目录；
+          # 不装 tools 包（新版 sdkmanager 已移除它，会直接报错退出）。
+          SDKMANAGER=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -n1 || true)
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+            "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
+          else
+            echo "no sdkmanager found, relying on preinstalled SDK"
+          fi
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Generate www/ from assets/
+        run: node scripts/prepare-www.mjs
+
+      - name: Capacitor copy into android project
+        run: npx cap copy android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/*.apk "out/shouhu-debug.apk"
+          ls -lh out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shouhu-debug-apk
+          path: out/shouhu-debug.apk
+          retention-days: 30
+
+      - name: Read app version
+        id: ver
+        run: |
+          VN=$(grep -m1 'versionName' android/app/build.gradle | sed -E 's/.*versionName[[:space:]]+"?([^"]+)"?.*/\1/')
+          VC=$(grep -m1 'versionCode' android/app/build.gradle | sed -E 's/.*versionCode[[:space:]]+([0-9]+).*/\1/')
+          echo "label=$VN ($VC)" >> "$GITHUB_OUTPUT"
+
+      # 打一个滚动的 latest-apk 标签并挂上 APK，手机直接点链接就能下载安装
+      - name: Publish rolling release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-apk
+          name: 守护 APK (latest)
+          body: |
+            版本 ${{ steps.ver.outputs.label }} · 自动构建（commit ${{ github.sha }}）
+
+            - 全屏无状态栏，内容铺满刘海/挖孔区域
+            - 数据导入导出写到「下载/守护」
+            - 返回键 / 左右边缘滑动逐层返回，不直接退出
+            - 已开放录音、相机、定位、通知、存储等运行所需权限
+            - 已移除右上角红色 DEBUG 按钮
+
+            直接点下方 `shouhu-debug.apk` 下载安装即可（覆盖安装不会丢数据）。
+          files: out/shouhu-debug.apk
+          prerelease: true
+          fail_on_unmatched_files: true
