@@ -72,14 +72,29 @@ jobs:
       - name: Generate www/ from assets/
         run: node scripts/prepare-www.mjs
 
-      - name: Capacitor copy into android project
-        run: npx cap copy android
+      # 必须用 sync 而不是 copy：copy 不会生成 android/capacitor-cordova-android-plugins，
+      # 而 settings.gradle 引用了这个被 git 忽略的模块目录，目录不存在 Gradle 会直接失败。
+      - name: Capacitor sync into android project
+        run: npx cap sync android
 
       - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../ci-gradle.log
+
+      # 构建失败时把 Gradle 日志推到 ci-logs 分支：工作流运行日志要登录 GitHub 才能看，
+      # 推到分支后手机/浏览器打开 raw 链接就能直接读。构建正常时这一步不会执行。
+      - name: Publish gradle log on failure
+        if: failure()
+        run: |
+          git config user.name "shouhu-ci"
+          git config user.email "shouhu-ci@users.noreply.github.com"
+          git checkout -B ci-logs
+          git add -f ci-gradle.log
+          git commit -m "ci: gradle log $(date -u +%FT%TZ) [skip ci]"
+          git push -f origin ci-logs
 
       - name: Collect APK
         run: |
