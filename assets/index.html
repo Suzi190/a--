@@ -25074,6 +25074,14 @@
                 }
             },
 
+            // 【数据保护】判断是不是"真的数据库损坏"
+            // 旧代码把任何带 database 字样的报错都当成损坏（连接没打开、被锁、表不存在都会命中），
+            // 然后写下标记让下次启动删库，等于稍有一次保存失败就把用户所有内容清掉。
+            isRealCorruption(error) {
+                const msg = String((error && (error.message || error)) || '');
+                return /corrupt|malformed|not a database|file is encrypted|disk\s*I\/O|SQLITE_NOTADB/i.test(msg);
+            },
+
             // 【新增】重置数据库（用于修复损坏的数据库）
             async resetDatabase(preserveData = true) {
                 try {
@@ -25538,13 +25546,13 @@
                     return true;
                 } catch (error) {
                     console.error('【SQLite】保存消息失败:', error);
-                    // 【关键修复】不再自动重置数据库，避免递归调用导致闪退
-                    // 只在控制台记录错误，不触发重置操作
-                    if (error.message && (error.message.includes('database') || error.message.includes('SQLITE') || error.message.includes('corrupt'))) {
-                        console.warn('【SQLite】检测到数据库错误，但不再自动重置以避免闪退');
-                        // 禁用 SQLite 防止持续报错
+                    // 【数据保护】只有真正的库文件损坏才切换存储；
+                    // 绝不再写 __sqlite_corrupted 标记——旧版本该标记会让下次启动直接删库，
+                    // 表现为「退出重进后所有内容被清空」。
+                    if (this.isRealCorruption(error)) {
+                        console.warn('【SQLite】检测到数据库损坏迹象，本次会话改用 IndexedDB（数据不会被删除）');
                         this.isAvailable = false;
-                        localStorage.setItem('__sqlite_corrupted', 'true');
+                        localStorage.setItem('__sqlite_last_error', String(error.message || error));
                     }
                     return false;
                 }
@@ -25614,13 +25622,11 @@
                     return successCount;
                 } catch (error) {
                     console.error('【SQLite】批量保存消息失败:', error);
-                    // 【关键修复】不再自动重置数据库，避免递归调用导致闪退
-                    // 只在控制台记录错误，不触发重置操作
-                    if (error.message && (error.message.includes('database') || error.message.includes('SQLITE') || error.message.includes('corrupt'))) {
-                        console.warn('【SQLite】检测到数据库错误，但不再自动重置以避免闪退');
-                        // 禁用 SQLite 防止持续报错
+                    // 【数据保护】同上：不再写删除标记，只有真损坏才降级
+                    if (this.isRealCorruption(error)) {
+                        console.warn('【SQLite】检测到数据库损坏迹象，本次会话改用 IndexedDB（数据不会被删除）');
                         this.isAvailable = false;
-                        localStorage.setItem('__sqlite_corrupted', 'true');
+                        localStorage.setItem('__sqlite_last_error', String(error.message || error));
                     }
                     return false;
                 }
@@ -26188,11 +26194,12 @@
                     return true;
                 } catch (error) {
                     console.error('【SQLite】保存关系数据失败:', error);
-                    // 【紧急修复】如果保存失败，禁用 SQLite 防止持续报错
-                    if (error.message && (error.message.includes('[object Object]') || error.message.includes('not valid JSON'))) {
-                        console.error('【SQLite】检测到严重错误，自动禁用 SQLite');
+                    // 【数据保护】保存失败只是这一次没写成，绝不能因此删库；
+                    // 只有真正的库文件损坏才降级到 IndexedDB。
+                    if (this.isRealCorruption(error)) {
+                        console.warn('【SQLite】检测到数据库损坏迹象，本次会话改用 IndexedDB（数据不会被删除）');
                         this.isAvailable = false;
-                        localStorage.setItem('__sqlite_corrupted', 'true');
+                        localStorage.setItem('__sqlite_last_error', String(error.message || error));
                     }
                     return false;
                 }
@@ -27701,29 +27708,64 @@
                 }
             
             // 【紧急修复】检查是否被禁用
-            const isDisabled = localStorage.getItem('__sqlite_disabled') === 'true';
+            let isDisabled = localStorage.getItem('__sqlite_disabled') === 'true';
+            if (isDisabled) {
+                // 【数据保护】如果降级存储里根本没有数据，说明真正的数据很可能还在 SQLite 库里，
+                // 这次就忽略历史禁用标记重新尝试一次，避免"内容看起来被清空"。
+                try {
+                    const fallbackData = await localforage.getItem('relationshipData');
+                    if (!fallbackData) {
+                        console.warn('【SQLite】本地降级存储没有数据，忽略历史禁用标记，本次重新尝试 SQLite');
+                        localStorage.removeItem('__sqlite_disabled');
+                        isDisabled = false;
+                    }
+                } catch (checkError) {
+                    console.warn('【SQLite】检查降级存储失败，保持禁用状态:', checkError);
+                }
+            }
             if (isDisabled) {
                 console.warn('【SQLite】SQLite 已被用户禁用，跳过初始化');
                 SQLiteManager.setAvailable(false);
                 return false;
             }
             
-            // 【紧急修复】检查是否需要强制重置数据库
+            // 【数据保护 / 重要】旧版本在保存失败时会写 __sqlite_corrupted 标记，
+            // 而启动时看到该标记就 deleteDatabase('chat_messages.db')。
+            // 这个库里有聊天记录、聊天列表、关系数据、世界书、个人资料——一删全没，
+            // 用户看到的就是"退出重进后内容被清空"。现在改为：
+            //   * 旧标记只记录日志并清除，绝不自动删库；
+            //   * 只有用户在「存储诊断」里主动点了重置（__sqlite_force_reset）才删库。
             const needsReset = localStorage.getItem('__sqlite_corrupted') === 'true';
             const forceReset = localStorage.getItem('__sqlite_force_reset') === 'true';
             
-            if (needsReset || forceReset) {
-                console.warn('【SQLite】检测到数据库损坏标记，准备强制重置...');
+            if (needsReset) {
+                console.warn('【SQLite】发现旧版本留下的错误标记，已忽略（不会删除数据库）');
                 localStorage.removeItem('__sqlite_corrupted');
+            }
+            
+            if (forceReset) {
+                console.warn('【SQLite】用户主动请求重置数据库，准备重建...');
                 localStorage.removeItem('__sqlite_force_reset');
                 
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorSQLite) {
                     try {
                         const { CapacitorSQLite } = window.Capacitor.Plugins;
-                        // 强制删除数据库
+                        // 删库前先把关系数据备份进 IndexedDB，尽量留一条后路
+                        try {
+                            const backup = await localforage.getItem('relationshipData');
+                            if (backup) {
+                                await localforage.setItem('__sqlite_backup_before_reset', {
+                                    backupTime: Date.now(),
+                                    data: backup
+                                });
+                                console.log('【SQLite】重置前已把关系数据备份到 IndexedDB');
+                            }
+                        } catch (backupError) {
+                            console.warn('【SQLite】重置前备份失败（继续重置）:', backupError);
+                        }
                         try {
                             await CapacitorSQLite.deleteDatabase({ database: 'chat_messages.db' });
-                            console.log('【SQLite】已强制删除损坏的数据库');
+                            console.log('【SQLite】已按用户请求删除数据库');
                         } catch (e) {
                             console.log('【SQLite】删除数据库失败（可能不存在）:', e.message);
                         }
@@ -27757,28 +27799,33 @@
                 
                 console.log('【SQLite】数据库初始化结果:', initResult);
                 
-                // 【自动修复】如果初始化失败，尝试重置数据库
-                let initSuccess = initResult === true;
-                if (!initSuccess) {
-                    console.warn('【SQLite】数据库初始化失败，尝试重置数据库...');
-                    const resetSuccess = await SQLiteManager.resetDatabase();
-                    if (resetSuccess) {
-                        console.log('【SQLite】数据库已重置，重新初始化...');
-                        try {
-                            initSuccess = await Promise.race([
-                                SQLiteManager.initDatabase(),
-                                new Promise((_, reject) => 
-                                    setTimeout(() => reject(new Error('数据库重新初始化超时')), 8000)
-                                )
-                            ]);
-                        } catch (timeoutError) {
-                            console.error('【SQLite】数据库重新初始化超时');
-                            initSuccess = false;
-                        }
-                        console.log('【SQLite】重新初始化结果:', initSuccess);
+                // 【数据保护 / 重要】初始化失败时绝不能再"自动重置数据库"。
+                // 旧逻辑：initDatabase() 只要失败（哪怕只是 10 秒超时）就 resetDatabase()，
+                // 而 resetDatabase() = deleteDatabase + 建空表 → 聊天记录、聊天列表、关系数据、
+                // 世界书、个人资料全部消失，用户看到的就是"退出重进后内容被清空"。
+                // 现在改为：失败只降级到 IndexedDB，数据库文件原样保留在磁盘上；
+                // 只有用户在「存储诊断」里主动点重置时才删库。
+                if (!initResult) {
+                    console.warn('【SQLite】首次初始化未成功，再重试一次（不删除任何数据）...');
+                    try {
+                        initResult = await Promise.race([
+                            SQLiteManager.initDatabase(),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('数据库二次初始化超时')), 15000)
+                            )
+                        ]);
+                    } catch (retryError) {
+                        console.error('【SQLite】二次初始化超时:', retryError.message);
+                        initResult = false;
                     }
+                    console.log('【SQLite】二次初始化结果:', initResult);
+                }
+
+                if (!initResult) {
+                    console.warn('【SQLite】数据库本次未能打开，本次会话改用 IndexedDB（数据库文件保留，内容不会丢失）');
                 }
                 
+                const initSuccess = initResult === true;
                 if (initSuccess) {
                     // 【新增】检查数据库大小并记录日志（不自动清理，保留所有回忆）
                     console.log('【SQLite】检查数据库状态...');
@@ -29554,7 +29601,15 @@
                         savedData = await localforage.getItem('relationshipData');
                         if (savedData) {
                             dataSource = 'localforage';
-                            console.log('✅ 从 localforage 加载数据（降级方案）');
+                            if (SQLiteManager.isAvailable) {
+                                // SQLite 可用却没有数据，基本就是数据库被重建过 → 用快照救回来
+                                console.warn('✅ SQLite 中没有数据，已从 localforage 快照恢复');
+                                setTimeout(() => {
+                                    try { showToast('已从本地快照恢复数据', 'info'); } catch (e) { /* ignore */ }
+                                }, 800);
+                            } else {
+                                console.log('✅ 从 localforage 加载数据（降级方案）');
+                            }
                         }
                     } catch (localforageError) {
                         console.warn('⚠️ localforage 加载失败，尝试 localStorage:', localforageError);
@@ -30472,6 +30527,26 @@
                     throw new Error('数据保存失败: ' + (saveError?.message || '未知错误'));
                 }
                 console.log('基本数据保存成功');
+
+                // 【数据保护】每 5 分钟额外在 IndexedDB(localforage) 留一份完整快照。
+                // loadData 在 SQLite 读不到数据时会自动回落到 localforage，
+                // 所以即使数据库被重建/清空，也能从这里把内容恢复回来。
+                try {
+                    const nowMirror = Date.now();
+                    if (!window.__lastLocalMirrorAt || nowMirror - window.__lastLocalMirrorAt > 5 * 60 * 1000) {
+                        if (serializedData.length <= 32 * 1024 * 1024) {
+                            window.__lastLocalMirrorAt = nowMirror;
+                            // 存对象而不是字符串：应用里多处旧代码是按对象读这个键的
+                            await localforage.setItem('relationshipData', JSON.parse(serializedData));
+                            await localforage.setItem('relationshipData_mirror_at', nowMirror);
+                            console.log('【数据保护】已写入 IndexedDB 快照备份');
+                        } else {
+                            console.warn('【数据保护】数据超过 32MB，跳过 IndexedDB 快照');
+                        }
+                    }
+                } catch (mirrorError) {
+                    console.warn('【数据保护】写入 IndexedDB 快照失败（不影响正常保存）:', mirrorError);
+                }
 
                 // 【修复】世界书额外写入独立的 world_books 表，作为 relationship_data 异常/被旧副本覆盖时的兜底
                 if (SQLiteManager.isAvailable && Array.isArray(relationshipData.worldBooks)) {
@@ -34386,6 +34461,90 @@
             }
         }, 10000);
 
+        /* ------------------------------------------------------------------
+         * 【诊断】初始化失败时显示一条可复制的错误信息
+         * 手机上没法开控制台，把真正的报错显示出来，方便反馈与定位
+         * ------------------------------------------------------------------ */
+        function fallbackCopyText(text) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = String(text == null ? '' : text);
+                ta.setAttribute('readonly', 'readonly');
+                ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+                document.body.appendChild(ta);
+                ta.select();
+                ta.setSelectionRange(0, ta.value.length);
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+                document.body.removeChild(ta);
+                return ok;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function copyTextToClipboard(text) {
+            const t = String(text == null ? '' : text);
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(t).catch(function () { fallbackCopyText(t); });
+                    return true;
+                }
+            } catch (e) { /* 落到下面的兜底方案 */ }
+            return fallbackCopyText(t);
+        }
+
+        function showInitErrorBanner(detail) {
+            try {
+                if (!document.body) return;
+                const old = document.getElementById('initErrorBanner');
+                if (old && old.parentNode) old.parentNode.removeChild(old);
+
+                const bar = document.createElement('div');
+                bar.id = 'initErrorBanner';
+                bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483000;' +
+                    'background:rgba(176,32,32,0.96);color:#fff;' +
+                    'font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;' +
+                    'padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));' +
+                    'box-shadow:0 2px 12px rgba(0,0,0,0.35);max-height:45vh;overflow:auto;' +
+                    'user-select:text;-webkit-user-select:text;-webkit-touch-callout:default;';
+
+                const msg = document.createElement('div');
+                msg.style.cssText = 'white-space:pre-wrap;word-break:break-all;margin-bottom:8px;';
+                msg.textContent = String(detail || '初始化失败');
+                bar.appendChild(msg);
+
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+                const makeBtn = function (label, handler, primary) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = label;
+                    b.style.cssText = 'border:0;border-radius:6px;padding:6px 14px;font-size:13px;' +
+                        (primary ? 'background:#fff;color:#b02020;' : 'background:rgba(255,255,255,0.22);color:#fff;');
+                    b.addEventListener('click', handler);
+                    return b;
+                };
+                row.appendChild(makeBtn('复制错误信息', function () {
+                    const ok = copyTextToClipboard(msg.textContent);
+                    try {
+                        if (typeof showToast === 'function') {
+                            showToast(ok ? '已复制，可以粘贴反馈' : '复制失败，请长按文字手动选择', 'info');
+                        }
+                    } catch (e) { /* ignore */ }
+                }, true));
+                row.appendChild(makeBtn('重新加载', function () { location.reload(); }, false));
+                row.appendChild(makeBtn('关闭', function () {
+                    if (bar.parentNode) bar.parentNode.removeChild(bar);
+                }, false));
+                bar.appendChild(row);
+
+                document.body.appendChild(bar);
+            } catch (e) {
+                console.warn('显示初始化错误条失败:', e);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
             // 【防闪退】再次检查，防止在DOMContentLoaded之前被调用
             if (window.__appDOMContentLoaded) {
@@ -34421,6 +34580,7 @@
 
                 // 【Capacitor SQLite】初始化SQLite（如果是APK环境）
                 updateLoadingProgress(20, '正在初始化数据库...');
+                window.__initStep = '初始化数据库';
                 try {
                     await initSQLite();
                 } catch (sqliteError) {
@@ -34432,6 +34592,7 @@
 
                 // 【Capacitor Preferences】初始化Preferences（如果是APK环境）
                 updateLoadingProgress(35, '正在初始化设置...');
+                window.__initStep = '初始化设置';
                 try {
                     await initPreferences();
                 } catch (prefsError) {
@@ -34439,25 +34600,42 @@
                     console.warn('【初始化错误】将使用 localStorage 作为备用');
                 }
 
-                // 加载数据
+                // 加载数据（最关键的一步，必须确保执行）
                 updateLoadingProgress(50, '正在加载数据...');
+                window.__initStep = '加载数据';
                 await loadData();
 
-                // 检查并清空过期的思念记录
-                updateLoadingProgress(65, '正在清理过期数据...');
-                await checkAndClearExpiredMissYouRecords();
+                // 【初始化容错】后面每一步单独 try/catch。
+                // 旧版本只要其中任意一步抛错，整段初始化就直接跳到 catch，
+                // 于是 loadData 之后的 renderWeChatChatList 不会执行，
+                // 聊天列表一片空白，看起来就像"内容全被清空了"。
+                const initSteps = [
+                    { label: '清理过期思念记录', progress: 65, text: '正在清理过期数据...', run: checkAndClearExpiredMissYouRecords },
+                    { label: '加载全局样式', progress: 75, text: '正在加载样式...', run: loadGlobalCss },
+                    { label: '初始化个人资料', progress: 85, text: '正在初始化个人资料...', run: initPersonalProfile },
+                    { label: '渲染聊天列表', progress: 95, text: '正在渲染界面...', run: renderWeChatChatList }
+                ];
+                for (const step of initSteps) {
+                    updateLoadingProgress(step.progress, step.text);
+                    window.__initStep = step.label;
+                    try {
+                        await step.run();
+                    } catch (stepError) {
+                        console.error('【初始化错误】步骤失败: ' + step.label, stepError);
+                        if (!window.__initErrors) window.__initErrors = [];
+                        window.__initErrors.push(step.label + '：' + ((stepError && stepError.message) || stepError));
+                    }
+                }
 
-                // 加载全局 CSS 美化设置
-                updateLoadingProgress(75, '正在加载样式...');
-                await loadGlobalCss();
-
-                // 【修复】先初始化个人资料，确保群聊头像能正确显示用户头像
-                updateLoadingProgress(85, '正在初始化个人资料...');
-                await initPersonalProfile();
-
-                // 渲染微信聊天列表（包括聊天标识）
-                updateLoadingProgress(95, '正在渲染界面...');
-                await renderWeChatChatList();
+                // 兜底：如果列表仍然空着，再渲染一次
+                try {
+                    const listEl = document.querySelector('.wechat-chat-list');
+                    if (listEl && !listEl.firstElementChild && typeof renderWeChatChatList === 'function') {
+                        await renderWeChatChatList();
+                    }
+                } catch (renderError) {
+                    console.warn('兜底渲染聊天列表失败:', renderError);
+                }
 
                 // 加载完成
                 updateLoadingProgress(100, '加载完成！');
@@ -34478,7 +34656,30 @@
                 if (loadingScreen) {
                     loadingScreen.classList.add('hidden');
                 }
+
+                // 【诊断】把真正的原因显示出来并留在本地，便于定位（不再只报一句"遇到问题"）
+                const stepName = window.__initStep || '未知';
+                const stepErrors = (window.__initErrors && window.__initErrors.length) ? '\n已容错的步骤：' + window.__initErrors.join('；') : '';
+                const detail = '初始化失败（步骤：' + stepName + '）\n' +
+                    ((initError && (initError.stack || initError.message)) || String(initError)) + stepErrors;
+                try { localStorage.setItem('__last_init_error', detail); } catch (e) { /* ignore */ }
+                console.error('【初始化诊断】' + detail);
+                showInitErrorBanner(detail);
                 showToast('初始化遇到问题，部分功能可能受限', 'warning');
+
+                // 【保底】初始化即使中断，也要把数据和聊天列表再加载/渲染一次，
+                // 避免出现"数据还在但界面全空"的错觉
+                try {
+                    window.__initStep = '失败后重新加载数据';
+                    await loadData();
+                } catch (reloadError) {
+                    console.error('二次加载数据失败:', reloadError);
+                }
+                try {
+                    await renderWeChatChatList();
+                } catch (rerenderError) {
+                    console.error('二次渲染聊天列表失败:', rerenderError);
+                }
             } finally {
                 initCompleted = true;
                 clearTimeout(initTimeoutId);
