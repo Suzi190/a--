@@ -65,6 +65,8 @@ public class MainActivity extends BridgeActivity {
     private static final int REQ_PERMS = 1001;
 
     private long lastBackAt = 0L;
+    /** 是否已经有权限请求在等用户点（网页的 checkPerm 与 onCreate 都会来申请，避免弹两次） */
+    private boolean permsRequestInFlight = false;
     /** 当前键盘高度（px）；0 = 键盘收起 */
     private int imeBottom = 0;
     /** 最近一次从 WindowInsets 拿到的 ime inset（API 30+ 精确值） */
@@ -432,8 +434,10 @@ public class MainActivity extends BridgeActivity {
     /**
      * 首次启动把运行需要的权限一次性要齐，省得用户点到录音/拍照/定位时才发现被拒。
      * 已经被用户拒绝过的不再重复纠缠（系统会直接返回拒绝，不弹框）。
+     *
+     * 也供 ShellBridge.checkPerm()（网页初始化时调用）复用。
      */
-    private void requestStartupPermissions() {
+    void requestStartupPermissions() {
         List<String> need = new ArrayList<>();
         addPermissionIfNeeded(need, Manifest.permission.CAMERA);
         addPermissionIfNeeded(need, Manifest.permission.RECORD_AUDIO);
@@ -451,10 +455,16 @@ public class MainActivity extends BridgeActivity {
             }
         }
         if (need.isEmpty()) return;
+        if (permsRequestInFlight) {
+            Log.i(TAG, "permission request already in flight, skip");
+            return;
+        }
+        permsRequestInFlight = true;
         Log.i(TAG, "requesting permissions: " + need);
         try {
             ActivityCompat.requestPermissions(this, need.toArray(new String[0]), REQ_PERMS);
         } catch (Exception e) {
+            permsRequestInFlight = false;
             Log.e(TAG, "requestPermissions failed", e);
         }
     }
@@ -475,6 +485,7 @@ public class MainActivity extends BridgeActivity {
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != REQ_PERMS) return;
+        permsRequestInFlight = false;
         for (int i = 0; i < permissions.length && i < grantResults.length; i++) {
             Log.i(TAG, "permission " + permissions[i] + " -> "
                     + (grantResults[i] == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));

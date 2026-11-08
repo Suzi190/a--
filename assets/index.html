@@ -34356,7 +34356,7 @@
 
         // 文本气泡内容变化监听
         // 【版本控制】应用版本号，更新时递增以强制清除缓存
-        const APP_VERSION = '1.0.1';
+        const APP_VERSION = '1.0.2';
 
         // 【版本控制】检查并清理旧版本缓存
         // 警示弹窗处理函数 - 移到前面确保全局可用
@@ -34545,6 +34545,43 @@
             }
         }
 
+        /* ------------------------------------------------------------------
+         * 【原生桥安全调用】
+         * 现在随包的原生壳（ShellBridge）只暴露了 ready/log/toast/setPageBackground/save*，
+         * 但网页里还留着旧壳的方法名：checkPerm、wakeUp、startBackgroundTimer、httpPost……
+         * 直接调用不存在的方法会抛 TypeError，而这句就在初始化流程里：
+         *   TypeError: window.AndroidShell.checkPerm is not a function
+         * 一抛就跳进 catch，后面的 SQLite 初始化根本不会执行 → 数据全部走兜底分支，
+         * 再进一次就"像被清空"。所有原生调用统一走 shellCall：没有就跳过，绝不抛错。
+         * ------------------------------------------------------------------ */
+        function shellCall(name) {
+            const args = Array.prototype.slice.call(arguments, 1);
+            try {
+                const shell = window.AndroidShell;
+                if (!shell) return undefined;
+                const fn = shell[name];
+                if (typeof fn !== 'function') {
+                    console.log('【原生桥】当前壳未提供 ' + name + '()，已跳过');
+                    return undefined;
+                }
+                return fn.apply(shell, args);
+            } catch (e) {
+                console.warn('【原生桥】调用 ' + name + '() 失败（已忽略）:', e);
+                return undefined;
+            }
+        }
+
+        function hasShellMethod(name) {
+            try {
+                return !!(window.AndroidShell && typeof window.AndroidShell[name] === 'function');
+            } catch (e) {
+                return false;
+            }
+        }
+
+        window.shellCall = shellCall;
+        window.hasShellMethod = hasShellMethod;
+
         document.addEventListener('DOMContentLoaded', async function() {
             // 【防闪退】再次检查，防止在DOMContentLoaded之前被调用
             if (window.__appDOMContentLoaded) {
@@ -34574,9 +34611,23 @@
                 updateLoadingProgress(5, '正在检查版本...');
                 await checkAndClearOldCache();
                 
-                // 检查并请求悬浮窗权限
+                // 检查并请求权限
+                // 【关键修复】这里原来直接调 window.AndroidShell.checkPerm()，
+                // 而当前原生壳并没有这个方法 → TypeError 会中断整个初始化（连 SQLite 都不会初始化），
+                // 数据只能落到兜底分支，重进就"像被清空"。现在做存在性判断 + try/catch，
+                // 真没有就交给原生启动时统一的权限申请（MainActivity.requestStartupPermissions）。
                 updateLoadingProgress(10, '正在检查权限...');
-                if(window.AndroidShell) window.AndroidShell.checkPerm();
+                window.__initStep = '检查权限';
+                try {
+                    if (window.hasShellMethod && window.hasShellMethod('checkPerm')) {
+                        window.shellCall('checkPerm');
+                    } else {
+                        console.log('【权限】原生壳未提供 checkPerm()，跳过（原生启动时已统一申请）');
+                    }
+                } catch (permError) {
+                    console.warn('【权限】请求权限失败（已忽略，不影响初始化）:', permError);
+                }
+                window.__initStep = '初始化数据库';
 
                 // 【Capacitor SQLite】初始化SQLite（如果是APK环境）
                 updateLoadingProgress(20, '正在初始化数据库...');
@@ -43207,7 +43258,7 @@ ${messageTexts}
             console.log('来电原因:', callReason);
             
             // 唤起APP到前台
-            if (window.AndroidShell) window.AndroidShell.wakeUp();
+            window.shellCall('wakeUp'); // 安全调用：壳里没有 wakeUp 也不会抛错中断视频通话
             
             const chatItem = relationshipData.wechatChatList.find(item => item.id == chatId);
             
@@ -45800,7 +45851,7 @@ ${callContent}
             console.log('来电原因:', callReason);
 
             // 唤起APP到前台
-            if(window.AndroidShell) window.AndroidShell.wakeUp();
+            window.shellCall('wakeUp'); // 安全调用：壳里没有 wakeUp 也不会抛错中断来电流程
             
             const voiceCallPage = document.getElementById('voiceCallPage');
             const chatItem = relationshipData.wechatChatList.find(item => item.id == chatId);
@@ -93355,7 +93406,7 @@ ${blackRoomState.endTime ? '倒计时：' + Math.ceil((blackRoomState.endTime - 
                     // 唤起APP到前台
                     if(window.AndroidShell) {
                         console.log('正在调用 AndroidShell.wakeUp()...');
-                        window.AndroidShell.wakeUp();
+                        window.shellCall('wakeUp'); // 安全调用，避免这里抛错导致测试流程中断
                         console.log('✅ AndroidShell.wakeUp() 调用完成');
                     } else {
                         console.warn('⚠️ AndroidShell 未定义，无法唤起前台');

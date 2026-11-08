@@ -3,6 +3,7 @@ package com.shouhu.app;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -68,6 +69,46 @@ public class ShellBridge {
     public void toast(final String msg) {
         if (msg == null) return;
         main.post(() -> Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show());
+    }
+
+    // ---------------- 权限 / 唤起前台 ----------------
+    // 网页里一直在调用这两个方法（初始化时的 checkPerm、AI 来电/视频通话前的 wakeUp），
+    // 但壳里之前没有实现 → 调用时抛 "window.AndroidShell.checkPerm is not a function"，
+    // 而这句在初始化流程里，会直接中断后续的 SQLite 初始化、导致数据全部走兜底分支。
+
+    /**
+     * 网页启动流程里的「检查并请求权限」。
+     * 真正的权限申请由 MainActivity 在启动时统一做过，这里只补一次：
+     * 仍缺的运行时权限再要一遍；已经全给过就什么都不做（不弹悬浮窗设置页，避免一进应用就跳走）。
+     */
+    @JavascriptInterface
+    public void checkPerm() {
+        main.post(() -> {
+            try {
+                activity.requestStartupPermissions();
+            } catch (Throwable t) {
+                Log.w(TAG, "checkPerm failed", t);
+            }
+        });
+    }
+
+    /**
+     * 把应用拉回前台（AI 主动来电 / 视频通话前调用）。
+     * Android 10+ 对后台启动 Activity 有限制，被系统拦下就只记日志，不影响网页后续逻辑。
+     */
+    @JavascriptInterface
+    public void wakeUp() {
+        main.post(() -> {
+            try {
+                Intent intent = new Intent(ctx, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                ctx.startActivity(intent);
+            } catch (Throwable t) {
+                Log.w(TAG, "wakeUp failed", t);
+            }
+        });
     }
 
     /**
